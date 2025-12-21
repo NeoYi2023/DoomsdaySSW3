@@ -11,6 +11,8 @@ import type {
 import { resolveGarbageOutput, type ResolvedGarbageOutput } from './EffectSystem';
 import { distributeLootToExplorers } from './InventorySystem';
 
+import type { ItemStack } from '../types/gameTypes';
+
 export interface GarbageProcessResult {
   explorers: Map<string, Explorer>;
   processedCount: number;
@@ -20,6 +22,7 @@ export interface GarbageProcessResult {
     isAdvanced: boolean;          // 是否进阶产出
     relatedCellIndices: number[]; // 相关角色格子索引（进阶产出时）
   }>;
+  remainingItems: ItemStack[]; // 未能放入角色背包的剩余物品（需要放入临时背包）
 }
 
 export interface BattleTurnResult {
@@ -248,9 +251,10 @@ export function processGarbageAfterBattle(
   }
 
   // 将所有产出应用到探险队背包（支持负值）
+  let remainingItems: ItemStack[] = [];
   if (allLoot.length > 0) {
     const explorersArray = Array.from(explorers.values());
-    const remaining = distributeLootToExplorers(
+    remainingItems = distributeLootToExplorers(
       explorersArray,
       allLoot.map((r) => ({ itemId: r.resourceId, quantity: r.quantity })),
       { getMaxStack },
@@ -262,5 +266,5 @@ export function processGarbageAfterBattle(
     }
   }
 
-  return { explorers, processedCount, lootAnimations };
+  return { explorers, processedCount, lootAnimations, remainingItems };
 }

@@ -63,6 +63,7 @@ export interface MapCellRuntime {
   state?: string;
   explorationPointId?: string;
   dropped?: DroppedItemOnCell;
+  explorationProgress?: number; // 探索进度 (0-100)
 }
 
 export interface ExplorationBoardCell {

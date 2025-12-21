@@ -4,17 +4,18 @@ import { ExplorationBoard, type ExplorationBoardRef } from './components/Explora
 import { TeamSelectionPanel } from './components/TeamSelectionPanel';
 import { TimeDisplay } from './components/TimeDisplay';
 import { InventoryPanel } from './components/InventoryPanel';
+import { ResourceTransferPanel } from './components/ResourceTransferPanel';
 import { LootAnimation } from './components/LootAnimation';
 import { QuestPanel } from './components/QuestPanel';
 import { ChapterStoryPanel } from './components/ChapterStoryPanel';
 import { generateExplorationBoardLayer } from './core/ExplorationSystem';
 import { resolveBattleTurn, processGarbageAfterBattle } from './core/BattleSystem';
-import { distributeLootToExplorers } from './core/InventorySystem';
+import { distributeLootToExplorers, addToExplorerInventory } from './core/InventorySystem';
 import { MapSystem, type WorldPosition } from './core/MapSystem';
 import { QuestSystem } from './core/QuestSystem';
 import { ChapterSystem } from './core/ChapterSystem';
 import { getText } from './core/LanguageManager';
-import type { ResourceStack, Quest, Chapter } from './types/gameTypes';
+import type { ResourceStack, Quest, Chapter, ItemStack } from './types/gameTypes';
 import type {
   Explorer,
   Monster,
@@ -70,10 +71,39 @@ export function App() {
   const [teamSelectionVisible, setTeamSelectionVisible] = useState(false);
   const [inventoryPanelVisible, setInventoryPanelVisible] = useState(false);
   const [selectedExplorerIds, setSelectedExplorerIds] = useState<string[]>([]);
+  // 临时背包状态
+  const [tempInventory, setTempInventory] = useState<ItemStack[]>([]);
+  const [isTempInventoryLocked, setIsTempInventoryLocked] = useState(true);
+  // 避难所仓库状态
+  const [shelterWarehouse, setShelterWarehouse] = useState<ItemStack[]>([]);
+  const [showResourceTransfer, setShowResourceTransfer] = useState(false);
   const [teamPosition, setTeamPosition] = useState<WorldPosition | null>(null);
   const [travelPath, setTravelPath] = useState<WorldPosition[]>([]);
   const [targetShelter, setTargetShelter] = useState<WorldPosition | null>(null); // 目标避难所位置（如果正在返回避难所）
   const travelTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 地图格子运行时状态（包含探索进度）
+  const [mapCellsRuntime, setMapCellsRuntime] = useState<MapCellRuntime[]>(() => {
+    // 初始化地图格子，为探索点设置探索进度为0
+    return mapConfigArr.map((c) => {
+      const cell: MapCellRuntime = {
+        x: c.X坐标,
+        y: c.Y坐标,
+        type: c.格子类型 as MapCellRuntime['type'],
+        state: c.初始状态,
+      };
+      // 如果是探索点，设置探索进度为0
+      if (c.格子类型 === '探索点' || c.格子类型 === 'ExplorationPoint') {
+        cell.explorationProgress = 0;
+        // 关联探索点ID
+        const pointIds = (c as any).资源生成规则ID as string[] | undefined;
+        if (pointIds && pointIds.length > 0) {
+          cell.explorationPointId = pointIds[0];
+        }
+      }
+      return cell;
+    });
+  });
   
   // 视觉反馈相关状态
   const [shakingCellIndices, setShakingCellIndices] = useState<Set<number>>(new Set());
@@ -495,12 +525,8 @@ export function App() {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'shelter-click-check',hypothesisId:'S2',location:'App.tsx:useEffect',message:'arrived at shelter (by path end)',data:{shelterPos:targetShelter,teamPosition},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
-        setExplorers(new Map());
-        setTeamPosition(null);
-        setTravelPath([]);
-        setTargetShelter(null);
-        setGameState('map');
-        alert('已返回避难所');
+        // 到达避难所，弹出资源转移界面
+        setShowResourceTransfer(true);
         return;
       }
 
@@ -538,6 +564,52 @@ export function App() {
     setSelectedExplorerIds([]);
   };
 
+  // 处理资源转移
+  const handleTransferResources = (selectedItems: ItemStack[]) => {
+    // 从所有角色背包中移除选中的资源
+    const updatedExplorers = new Map<string, Explorer>();
+    for (const [id, explorer] of explorers.entries()) {
+      const updatedInventory = explorer.inventory.map((item) => {
+        const selectedItem = selectedItems.find((si) => si.itemId === item.itemId);
+        if (selectedItem) {
+          // 减少数量
+          const newQuantity = Math.max(0, item.quantity - selectedItem.quantity);
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      }).filter((item) => item.quantity > 0);
+      
+      updatedExplorers.set(id, { ...explorer, inventory: updatedInventory });
+    }
+    setExplorers(updatedExplorers);
+    
+    // 将资源添加到仓库（合并相同物品）
+    setShelterWarehouse((prev) => {
+      const merged = new Map<string, ItemStack>();
+      for (const item of [...prev, ...selectedItems]) {
+        const existing = merged.get(item.itemId);
+        if (existing) {
+          existing.quantity += item.quantity;
+        } else {
+          merged.set(item.itemId, { ...item });
+        }
+      }
+      return Array.from(merged.values());
+    });
+    
+    // 关闭资源转移界面
+    setShowResourceTransfer(false);
+    
+    // 清空探险队状态
+    setExplorers(new Map());
+    setTeamPosition(null);
+    setTravelPath([]);
+    setTargetShelter(null);
+    setGameState('map');
+    
+    alert('资源已转移到避难所仓库');
+  };
+
 
   const handleNextRound = () => {
     if (!boardLayer || !selectedPoint) return;
@@ -546,8 +618,20 @@ export function App() {
     fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleNextRound',message:'entry',data:{currentLayer,selectedPointId:selectedPoint.ID,maxLayers:selectedPoint.最大层数},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
-    // 1. 先结算战斗
-    const battleResult = resolveBattleTurn(boardLayer, explorers, monsters);
+    // 0. 回合开始时清空临时背包并锁定
+    setTempInventory([]);
+    setIsTempInventoryLocked(true);
+    
+    // 0.1 回合开始时扣除体力（每回合-1，最低为0）
+    const updatedExplorers = new Map<string, Explorer>();
+    for (const [id, explorer] of explorers.entries()) {
+      const newStamina = Math.max(0, explorer.currentStamina - 1);
+      updatedExplorers.set(id, { ...explorer, currentStamina: newStamina });
+    }
+    setExplorers(updatedExplorers);
+    
+    // 1. 先结算战斗（使用更新后的explorers）
+    const battleResult = resolveBattleTurn(boardLayer, updatedExplorers, monsters);
     
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleNextRound',message:'after battle',data:{monstersCount:battleResult.monsters.size,explorersCount:battleResult.explorers.size},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
@@ -566,6 +650,24 @@ export function App() {
     // 处理视觉反馈
     if (garbageResult.lootAnimations.length > 0) {
       handleLootAnimations(garbageResult.lootAnimations);
+    }
+    
+    // 2.1 处理剩余物品：如果有剩余物品，解锁临时背包并放入
+    if (garbageResult.remainingItems.length > 0) {
+      setIsTempInventoryLocked(false);
+      setTempInventory((prev) => {
+        // 合并相同物品ID的堆叠
+        const merged = new Map<string, ItemStack>();
+        for (const item of [...prev, ...garbageResult.remainingItems]) {
+          const existing = merged.get(item.itemId);
+          if (existing) {
+            existing.quantity += item.quantity;
+          } else {
+            merged.set(item.itemId, { ...item });
+          }
+        }
+        return Array.from(merged.values());
+      });
     }
     
     // 3. 检查是否完成当前层（所有怪物被消灭，且还有至少1个角色存活）
@@ -618,6 +720,21 @@ export function App() {
       fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleNextRound',message:'before state update',data:{nextLayer,newMonstersCount:newMonsters.size,updatedBoardCellsCount:updatedBoard.cells.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
       
+      // 更新探索进度
+      const pointPos = findPointPosition(selectedPoint.ID);
+      if (pointPos) {
+        setMapCellsRuntime((prev) => {
+          return prev.map((cell) => {
+            if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
+              // 计算新的探索进度
+              const newProgress = Math.round((nextLayer / selectedPoint.最大层数) * 100);
+              return { ...cell, explorationProgress: newProgress };
+            }
+            return cell;
+          });
+        });
+      }
+      
       setExplorers(garbageResult.explorers);
       setMonsters(newMonsters);
       setBoardLayer(updatedBoard);
@@ -639,6 +756,25 @@ export function App() {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleNextRound',message:'max layer reached',data:{currentLayer,maxLayers:selectedPoint.最大层数},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
+      
+      // 更新探索进度为100%，并转换格子类型为空地
+      const pointPos = findPointPosition(selectedPoint.ID);
+      if (pointPos) {
+        setMapCellsRuntime((prev) => {
+          return prev.map((cell) => {
+            if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
+              // 探索进度达到100%，转换为空地
+              return {
+                ...cell,
+                explorationProgress: 100,
+                type: 'Obstacle', // 转换为空地
+                explorationPointId: undefined, // 清除探索点ID
+              };
+            }
+            return cell;
+          });
+        });
+      }
       
       // 更新任务系统：记录探索完成
       if (questSystemRef.current && selectedPoint) {
@@ -734,6 +870,7 @@ export function App() {
           </p>
           <WorldMap
             mapCells={mapConfigArr}
+            mapCellsRuntime={mapCellsRuntime}
             points={pointsArr}
             onSelectPoint={handleSelectPoint}
             onSelectShelter={handleSelectShelter}
@@ -803,7 +940,47 @@ export function App() {
       <InventoryPanel
         visible={inventoryPanelVisible}
         explorers={explorersArray}
+        tempInventory={tempInventory}
+        isTempInventoryLocked={isTempInventoryLocked}
         onClose={() => setInventoryPanelVisible(false)}
+        onMoveFromTempToExplorer={(itemId, quantity, explorerId) => {
+          // 从临时背包移动到角色背包
+          const explorer = explorers.get(explorerId);
+          if (!explorer) return;
+          
+          // 尝试添加到角色背包
+          const remaining = addToExplorerInventory(
+            explorer,
+            { itemId, quantity },
+            getMaxStack,
+          );
+          
+          // 更新角色背包
+          setExplorers((prev) => {
+            const updated = new Map(prev);
+            updated.set(explorerId, explorer);
+            return updated;
+          });
+          
+          // 更新临时背包
+          setTempInventory((prev) => {
+            const updated = prev.map((item) => {
+              if (item.itemId === itemId) {
+                const newQuantity = remaining.quantity;
+                if (newQuantity <= 0) return null;
+                return { ...item, quantity: newQuantity };
+              }
+              return item;
+            }).filter((item): item is ItemStack => item !== null);
+            
+            // 如果临时背包为空，锁定它
+            if (updated.length === 0) {
+              setIsTempInventoryLocked(true);
+            }
+            
+            return updated;
+          });
+        }}
       />
       <QuestPanel
         quests={quests}
@@ -860,6 +1037,21 @@ export function App() {
           }}
         />
       )}
+      <ResourceTransferPanel
+        visible={showResourceTransfer}
+        explorers={explorersArray}
+        warehouse={shelterWarehouse}
+        onClose={() => {
+          // 如果关闭时没有转移，也清空探险队（玩家取消转移）
+          setShowResourceTransfer(false);
+          setExplorers(new Map());
+          setTeamPosition(null);
+          setTravelPath([]);
+          setTargetShelter(null);
+          setGameState('map');
+        }}
+        onTransfer={handleTransferResources}
+      />
     </div>
   );
 }

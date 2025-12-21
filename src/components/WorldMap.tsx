@@ -6,8 +6,11 @@ export interface WorldPosition {
   y: number;
 }
 
+import type { MapCellRuntime } from '../types/gameTypes';
+
 export interface WorldMapProps {
   mapCells: MapConfigEntry[];
+  mapCellsRuntime?: MapCellRuntime[]; // 运行时地图数据（包含探索进度）
   points: ExplorationPointConfigEntry[];
   onSelectPoint: (point: ExplorationPointConfigEntry) => void;
   onSelectShelter?: (position: WorldPosition) => void;
@@ -21,7 +24,7 @@ interface InternalCell {
   point?: ExplorationPointConfigEntry;
 }
 
-export function WorldMap({ mapCells, points, onSelectPoint, onSelectShelter, teamPosition }: WorldMapProps) {
+export function WorldMap({ mapCells, mapCellsRuntime, points, onSelectPoint, onSelectShelter, teamPosition }: WorldMapProps) {
   if (!mapCells.length) return <div>地图配置为空</div>;
 
   const pointById = new Map<string, ExplorationPointConfigEntry>();
@@ -139,8 +142,17 @@ export function WorldMap({ mapCells, points, onSelectPoint, onSelectShelter, tea
         boxShadow = 'inset 0 0 0 1px #555';
       } else if (isExploration) {
         // 探索点：橙色实心格子 + 向内描边（1 像素）
-        bg = '#ff9800';
-        label = '📍';
+        // 检查运行时数据中的探索进度
+        const runtimeCell = mapCellsRuntime?.find((rc) => rc.x === x && rc.y === y);
+        const progress = runtimeCell?.explorationProgress ?? 0;
+        // 如果探索进度达到100%，显示为灰色（已探索完成）
+        if (progress >= 100) {
+          bg = '#666';
+          label = '✓';
+        } else {
+          bg = '#ff9800';
+          label = '📍';
+        }
         border = 'none';
         boxShadow = 'inset 0 0 0 1px #555';
       } else if (isRoad) {
@@ -162,6 +174,16 @@ export function WorldMap({ mapCells, points, onSelectPoint, onSelectShelter, tea
       const clickable = (isExploration && hasPoint) || (isShelter && !!teamPosition && !!onSelectShelter);
       const isTeamHere = teamPosition && teamPosition.x === x && teamPosition.y === y;
 
+      // 构建title提示
+      let cellTitle = '';
+      if (isExploration && cell.point) {
+        const runtimeCell = mapCellsRuntime?.find((rc) => rc.x === x && rc.y === y);
+        const progress = runtimeCell?.explorationProgress ?? 0;
+        cellTitle = `${getText(cell.point.名称Key ?? cell.point.ID)} - 探索进度: ${progress}%`;
+      } else if (isShelter) {
+        cellTitle = '避难所';
+      }
+
       cells.push(
         <div
           key={key}
@@ -173,6 +195,7 @@ export function WorldMap({ mapCells, points, onSelectPoint, onSelectShelter, tea
             cursor: clickable ? 'pointer' : 'default',
             position: 'relative',
           }}
+          title={cellTitle}
           onClick={() => {
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/785ee644-5db5-4b52-b42f-bb682139b76e', {

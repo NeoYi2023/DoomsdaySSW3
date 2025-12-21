@@ -1,13 +1,23 @@
-import type { Explorer } from '../types/gameTypes';
+import type { Explorer, ItemStack } from '../types/gameTypes';
 import { getText } from '../core/LanguageManager';
 
 export interface InventoryPanelProps {
   visible: boolean;
   explorers: Explorer[];
+  tempInventory?: ItemStack[];
+  isTempInventoryLocked?: boolean;
   onClose: () => void;
+  onMoveFromTempToExplorer?: (itemId: string, quantity: number, explorerId: string) => void;
 }
 
-export function InventoryPanel({ visible, explorers, onClose }: InventoryPanelProps) {
+export function InventoryPanel({
+  visible,
+  explorers,
+  tempInventory = [],
+  isTempInventoryLocked = true,
+  onClose,
+  onMoveFromTempToExplorer,
+}: InventoryPanelProps) {
   if (!visible) return null;
 
   return (
@@ -128,6 +138,78 @@ export function InventoryPanel({ visible, explorers, onClose }: InventoryPanelPr
                 </div>
               );
             })}
+          </div>
+        )}
+        
+        {/* 临时背包区域 */}
+        {!isTempInventoryLocked && tempInventory.length > 0 && (
+          <div
+            style={{
+              marginTop: 24,
+              padding: 16,
+              border: '2px solid #ff9800',
+              borderRadius: 8,
+              background: '#2a1a0a',
+            }}
+          >
+            <div style={{ marginBottom: 12, color: '#ff9800', fontWeight: 'bold' }}>
+              ⚠️ 临时背包（本回合结束后将清空）
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                gap: 4,
+              }}
+            >
+              {tempInventory.map((item, index) => (
+                <div
+                  key={`${item.itemId}-${index}`}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    border: '1px solid #ff9800',
+                    borderRadius: 4,
+                    padding: 4,
+                    background: '#3a2a1a',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                  }}
+                >
+                  <div style={{ marginBottom: 4, fontSize: 16 }}>📦</div>
+                  <div style={{ textAlign: 'center', wordBreak: 'break-word' }}>
+                    {item.itemId}
+                  </div>
+                  <div style={{ color: '#ff9800', fontWeight: 'bold' }}>x{item.quantity}</div>
+                  {onMoveFromTempToExplorer && explorers.length > 0 && (
+                    <button
+                      style={{
+                        marginTop: 4,
+                        padding: '2px 6px',
+                        fontSize: 10,
+                        background: '#4caf50',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        // 移动到第一个有空间的探险者
+                        const firstExplorer = explorers[0];
+                        if (firstExplorer) {
+                          onMoveFromTempToExplorer(item.itemId, item.quantity, firstExplorer.id);
+                        }
+                      }}
+                    >
+                      移动
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
