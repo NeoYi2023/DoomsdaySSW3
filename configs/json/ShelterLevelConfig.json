@@ -19,14 +19,11 @@
       "storage_basic"
     ],
     "可建造设施ID列表": [
-      "storage_basic"
+      "storage_basic",
+      "workshop_advanced"
     ],
-    "最大设施数量": "workshop_advanced",
-    "升级前置条件资源ID": "8",
-    "升级前置条件资源数量": "resource_metal",
-    "初始工具ID列表": [
-      "50"
-    ]
+    "升级前置条件资源ID": "resource_metal",
+    "升级前置条件资源数量": 50
   },
   {
     "等级": 3,
@@ -34,13 +31,10 @@
       "defense_basic"
     ],
     "可建造设施ID列表": [
-      "defense_basic"
+      "defense_basic",
+      "workshop_advanced"
     ],
-    "最大设施数量": "workshop_advanced",
-    "升级前置条件资源ID": "12",
-    "升级前置条件资源数量": "resource_metal",
-    "初始工具ID列表": [
-      "100"
-    ]
+    "升级前置条件资源ID": "resource_metal",
+    "升级前置条件资源数量": 100
   }
 ]

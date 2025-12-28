@@ -1,4 +1,4 @@
 等级,默认解锁设施ID列表,可建造设施ID列表,最大设施数量,升级前置条件资源ID,升级前置条件资源数量,初始工具ID列表
 1,workshop_basic,workshop_basic,5,,,equipment_tool_1_sieve|equipment_tool_2_trap
-2,storage_basic,storage_basic,workshop_advanced,8,resource_metal,50,
-3,defense_basic,defense_basic,workshop_advanced,12,resource_metal,100,
+2,storage_basic,storage_basic|workshop_advanced,,resource_metal,50,
+3,defense_basic,defense_basic|workshop_advanced,,resource_metal,100,

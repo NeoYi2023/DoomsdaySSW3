@@ -6,4 +6,3 @@ equipment_tool_4_crowbar,equipment.tool.4.crowbar.name,equipment.tool.4.crowbar.
 equipment_tool_5_bow,equipment.tool.5.bow.name,equipment.tool.5.bow.desc,工具|食物搜集,食物,EnhanceGarbageOutput,TargetSubType=野兽;Range=1;FoodPerTarget=20,1
 equipment_tool_6_black_back,equipment.tool.6.black_back.name,equipment.tool.6.black_back.desc,工具|食物搜集,食物,HumanNeighborBonus,Range=1;FoodPerHuman=1,1
 equipment_tool_7_hoe,equipment.tool.7.hoe.name,equipment.tool.7.hoe.desc,工具|食物搜集,食物,EnhanceGarbageOutput,TargetId=garbage_food_1;Range=0;FoodPerTarget=9,1
-
