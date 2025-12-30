@@ -21,6 +21,11 @@ export interface ExplorationBoardGenerationInput {
   monsterConfigs: MonsterConfigEntry[];
   garbageConfigs: GarbageConfigEntry[];
   layerIndex: number; // 当前层数（从1开始）
+  oreChoices?: Array<{
+    affectedOreIds: string[]; // 影响的矿石ID列表
+    weightMultiplier?: number; // 权重倍数（默认1.0）
+    maxCount?: number; // 数量上限（默认无限制）
+  }>; // 矿石选择影响列表（可选，累积生效）
 }
 
 export interface ExplorationBoardGenerationResult {
@@ -88,7 +93,7 @@ function chooseWeighted<T extends { weight: number }>(items: T[]): T | null {
 export function generateExplorationBoardLayer(
   input: ExplorationBoardGenerationInput,
 ): ExplorationBoardGenerationResult {
-  const { pointConfig, explorers, monsterConfigs, garbageConfigs, layerIndex } = input;
+  const { pointConfig, explorers, monsterConfigs, garbageConfigs, layerIndex, oreChoices } = input;
 
 
   const totalCells = 6 * 4;
@@ -133,13 +138,59 @@ export function generateExplorationBoardLayer(
 
   // 预先过滤出 Monster / Garbage 的 spawn 条目，方便按类型选择
   const monsterEntries = spawnEntries.filter((s) => s.kind === 'Monster');
-  const garbageEntries = spawnEntries.filter((s) => s.kind === 'Garbage');
+  let garbageEntries = spawnEntries.filter((s) => s.kind === 'Garbage');
 
+  // 如果存在矿石选择列表，计算每个矿石的累积权重和最小数量上限
+  const oreWeightMap = new Map<string, number>(); // 矿石ID -> 累积权重倍数
+  const oreMaxCountMap = new Map<string, number>(); // 矿石ID -> 最小数量上限
+
+  if (oreChoices && oreChoices.length > 0) {
+    // 遍历所有选项，收集每个矿石ID的所有影响
+    for (const choice of oreChoices) {
+      if (!choice.affectedOreIds || choice.affectedOreIds.length === 0) continue;
+
+      for (const oreId of choice.affectedOreIds) {
+        // 累加权重：基础权重是1.0，每个选项的权重倍数是相对于1.0的增加量
+        // 例如：如果选项1的权重倍数是2.0，选项2的权重倍数是1.5
+        // 那么累加后的权重 = 1.0 + (2.0 - 1.0) + (1.5 - 1.0) = 1.0 + 1.0 + 0.5 = 2.5
+        const weightIncrease = (choice.weightMultiplier ?? 1.0) - 1.0;
+        oreWeightMap.set(oreId, (oreWeightMap.get(oreId) ?? 1.0) + weightIncrease);
+
+        // 取最小数量上限
+        if (choice.maxCount !== undefined) {
+          const current = oreMaxCountMap.get(oreId);
+          if (current === undefined || choice.maxCount < current) {
+            oreMaxCountMap.set(oreId, choice.maxCount);
+          }
+        }
+      }
+    }
+
+    // 应用权重调整：受影响的矿石权重增加，其他矿石权重降低
+    garbageEntries = garbageEntries.map((entry) => {
+      const weightMultiplier = oreWeightMap.get(entry.id);
+      if (weightMultiplier !== undefined) {
+        // 受影响的矿石：应用累积权重倍数
+        return {
+          ...entry,
+          weight: entry.weight * weightMultiplier,
+        };
+      } else {
+        // 未受影响的矿石：权重减半
+        return {
+          ...entry,
+          weight: entry.weight * 0.5,
+        };
+      }
+    });
+  }
 
   // 简单规则：剩余空格子中，尝试轮流按权重选怪物/垃圾放置，直到没有可放或格子用完
   let placedCount = 0;
   const monsterPositions: number[] = [];
   const garbagePositions: number[] = [];
+  const garbageCountMap = new Map<string, number>(); // 记录每种垃圾已放置的数量
+
   while (availableIndices.length > 0) {
     const cellIndex = rngPickIndex();
     if (cellIndex === -1) break;
@@ -157,11 +208,24 @@ export function generateExplorationBoardLayer(
     // 再尝试放垃圾
     const garbageEntry = chooseWeighted(garbageEntries);
     if (garbageEntry) {
+      // 检查数量上限（使用最小数量上限）
+      const maxCount = oreMaxCountMap.get(garbageEntry.id);
+      if (maxCount !== undefined) {
+        const currentCount = garbageCountMap.get(garbageEntry.id) ?? 0;
+        // 如果达到上限，跳过
+        if (currentCount >= maxCount) {
+          // 移除已达到上限的条目，避免重复选择
+          garbageEntries = garbageEntries.filter((e) => e.id !== garbageEntry.id);
+          continue;
+        }
+      }
       
       if (garbageMap.has(garbageEntry.id)) {
         cell.garbageId = garbageEntry.id;
         garbagePositions.push(cellIndex);
         placedCount++;
+        // 更新计数
+        garbageCountMap.set(garbageEntry.id, (garbageCountMap.get(garbageEntry.id) ?? 0) + 1);
         continue;
       }
     }

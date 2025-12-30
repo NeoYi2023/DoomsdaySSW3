@@ -12,6 +12,8 @@ import type {
   QuestConfigEntry,
   ChapterConfigEntry,
   EquipmentConfigEntry,
+  ShipConfigEntry,
+  DefenseFacilityConfigEntry,
 } from './configTypes';
 
 export interface ItemStack {
@@ -43,6 +45,11 @@ export interface Monster {
   id: string;
   config: MonsterConfigEntry;
   currentHp: number;
+  isInvader?: boolean; // 是否为入侵怪物
+  monsterType?: 'melee' | 'ranged'; // 近战或远程
+  targetType?: 'ship' | 'facility'; // 攻击目标类型
+  currentPosition?: { x: number; y: number }; // 在探索棋盘上的位置
+  targetPosition?: { x: number; y: number } | null; // 目标位置（设施或船体）
 }
 
 // 地图格子类型：
@@ -86,6 +93,8 @@ export interface ExplorationSession {
   currentLayerIndex: number;
   maxLayers: number;
   board: ExplorationBoardLayer;
+  vibrationValue?: number; // 当前震动值
+  currentOreChoice?: string; // 当前层选择的矿石选项ID（影响下一层的矿石生成）
 }
 
 export interface GarbageUnitRuntime {
@@ -172,6 +181,30 @@ export interface Equipment {
   matchedGarbageTypes: string[]; // 匹配的垃圾类型列表
 }
 
+export interface ProspectingShip {
+  shipId: string;
+  config: ShipConfigEntry;
+  currentHp: number; // 船体当前血量
+  maxHp: number; // 船体最大血量
+  baseVibrationPerRound: number; // 每回合默认增加的震动值（可通过升级降低）
+}
+
+export interface DefenseFacility {
+  id: string;
+  config: DefenseFacilityConfigEntry;
+  currentHp: number;
+  level: number; // 设施等级
+  position: { x: number; y: number }; // 在探索棋盘外围的位置
+  lastAttackTime: number; // 上次攻击时间（用于攻击速度控制）
+}
+
+export interface InvasionState {
+  isActive: boolean; // 是否正在进行入侵战斗
+  invasionMonsters: Map<string, Monster>; // 入侵怪物列表
+  facilities: Map<string, DefenseFacility>; // 防御设施列表
+  startTime: number; // 入侵开始时间
+}
+
 export type {
   ExplorerConfigEntry,
   MonsterConfigEntry,
@@ -186,4 +219,6 @@ export type {
   QuestConfigEntry,
   ChapterConfigEntry,
   EquipmentConfigEntry,
+  ShipConfigEntry,
+  DefenseFacilityConfigEntry,
 };

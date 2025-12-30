@@ -38,6 +38,8 @@ export interface ExplorationPointConfigEntry {
   最大层数: number;
   探索难度: string;
   棋盘出现内容: string | string[]; // 字符串格式: "Monster_monster_zombie_10|Garbage_garbage_trash_5" 或数组格式: ["Monster_monster_zombie_10", "Garbage_garbage_trash_5"]
+  震动值最大值?: number; // 每个探索点独立配置的震动值最大值
+  入侵怪物配置列表?: string | string[]; // 格式同"棋盘出现内容"，例如：`"Monster_monster_invader_1_10|Monster_monster_invader_2_5"`
 }
 
 export interface ResourceConfigEntry {
@@ -59,6 +61,7 @@ export interface ItemConfigEntry {
   使用效果数值?: number | string;
   消耗条件?: string;
   堆叠最大数量: number;
+  增加震动值?: number; // 道具触发时增加的震动值（可选）
 }
 
 export interface ShelterLevelConfigEntry {
@@ -150,6 +153,39 @@ export interface EquipmentConfigEntry {
   堆叠最大数量?: number; // 堆叠最大数量（如果装备可以作为道具）
 }
 
+export interface ShipConfigEntry {
+  ID: string; // 勘探船ID
+  名称Key: string;
+  描述Key?: string;
+  初始血量: number; // 船体初始血量
+  最大血量: number; // 船体最大血量
+  每回合震动值增加值: number; // 勘探船每回合默认增加的震动值
+}
+
+export interface DefenseFacilityConfigEntry {
+  ID: string; // 设施ID
+  名称Key: string;
+  描述Key?: string;
+  设施类型: string; // 如"炮台"、"护盾"等
+  初始血量: number;
+  最大血量: number;
+  攻击力: number; // 防御设施的攻击力
+  攻击范围: number; // 攻击范围（格子数）
+  攻击速度: number; // 每秒攻击次数
+  建造消耗资源列表?: string; // 格式：资源ID_数量|资源ID_数量
+  升级消耗资源列表?: string; // 格式同上
+}
+
+export interface OreChoiceConfigEntry {
+  ID: string; // 选择选项ID
+  名称Key: string;
+  描述Key?: string;
+  影响的矿石ID列表: string | string[]; // 格式：garbage_id_1|garbage_id_2 或数组格式
+  权重调整?: number; // 权重倍数（默认1.0，大于1增加出现概率，小于1减少）
+  数量上限?: number; // 该层最多出现多少个该类矿石（默认无限制）
+  图标Key?: string; // 图标资源Key（可选）
+}
+
 export interface ConfigBundle {
   explorers: ExplorerConfigEntry[];
   monsters: MonsterConfigEntry[];
@@ -165,4 +201,7 @@ export interface ConfigBundle {
   quests: QuestConfigEntry[];
   chapters: ChapterConfigEntry[];
   equipments: EquipmentConfigEntry[];
+  ships: ShipConfigEntry[];
+  defenseFacilities: DefenseFacilityConfigEntry[];
+  oreChoices: OreChoiceConfigEntry[];
 }

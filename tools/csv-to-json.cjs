@@ -209,7 +209,10 @@ function main() {
     'AdvancedOutputConditionConfig_进阶产出机制配置表.csv': 'AdvancedOutputConditionConfig.json',
     'SkillConfig_技能配置表.csv': 'SkillConfig.json',
     'TalentConfig_天赋配置表.csv': 'TalentConfig.json',
-    'LocalizationConfig_多语言配置表.csv': 'LocalizationConfig.json'
+    'LocalizationConfig_多语言配置表.csv': 'LocalizationConfig.json',
+    'ShipConfig_勘探船配置表.csv': 'ShipConfig.json',
+    'DefenseFacilityConfig_防御设施配置表.csv': 'DefenseFacilityConfig.json',
+    'OreChoiceConfig_矿石选择配置表.csv': 'OreChoiceConfig.json'
   };
 
   // 特殊处理的配置表（非数组格式）

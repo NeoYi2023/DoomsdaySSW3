@@ -1,0 +1,54 @@
+[
+  {
+    "ID": "ore_choice_food_focus",
+    "名称Key": "ore.choice.food_focus.name",
+    "描述Key": "ore.choice.food_focus.desc",
+    "影响的矿石ID列表": [
+      "garbage_10001",
+      "garbage_10002",
+      "garbage_10003",
+      "garbage_10004",
+      "garbage_10005",
+      "garbage_10006",
+      "garbage_10007",
+      "garbage_10008",
+      "garbage_food_1",
+      "garbage_food_2",
+      "garbage_food_3",
+      "garbage_food_4",
+      "garbage_food_5"
+    ],
+    "权重调整": 2.0,
+    "数量上限": 12
+  },
+  {
+    "ID": "ore_choice_material_focus",
+    "名称Key": "ore.choice.material_focus.name",
+    "描述Key": "ore.choice.material_focus.desc",
+    "影响的矿石ID列表": [
+      "garbage_20001",
+      "garbage_20002",
+      "garbage_20003",
+      "garbage_20004",
+      "garbage_20005"
+    ],
+    "权重调整": 2.0,
+    "数量上限": 10
+  },
+  {
+    "ID": "ore_choice_balanced",
+    "名称Key": "ore.choice.balanced.name",
+    "描述Key": "ore.choice.balanced.desc",
+    "影响的矿石ID列表": [
+      "garbage_10001",
+      "garbage_10002",
+      "garbage_10003",
+      "garbage_20001",
+      "garbage_20002",
+      "garbage_20003"
+    ],
+    "权重调整": 1.5,
+    "数量上限": 15
+  }
+]
+

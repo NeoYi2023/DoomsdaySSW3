@@ -1,5 +1,5 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import type { ExplorationBoardLayer, Explorer, Monster, ResourceStack } from '../types/gameTypes';
+import type { ExplorationBoardLayer, Explorer, Monster, ResourceStack, DefenseFacility } from '../types/gameTypes';
 import type { GarbageConfigEntry, ResourceConfigEntry } from '../types/configTypes';
 import { ExplorationCell } from './ExplorationCell';
 import { applyShakeEffect } from '../utils/shakeAnimation';
@@ -13,6 +13,9 @@ export interface ExplorationBoardProps {
   // 视觉反馈数据
   shakingCellIndices?: Set<number>;
   displayLootByCell?: Map<number, ResourceStack[]>;
+  // 入侵系统相关
+  invasionMonsters?: Map<string, Monster>; // 入侵怪物列表
+  defenseFacilities?: Map<string, DefenseFacility>; // 防御设施列表
 }
 
 export interface ExplorationBoardRef {
@@ -20,7 +23,7 @@ export interface ExplorationBoardRef {
 }
 
 export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoardProps>(
-  ({ layer, explorers, monsters, garbages, resourceConfigs, shakingCellIndices, displayLootByCell }, ref) => {
+  ({ layer, explorers, monsters, garbages, resourceConfigs, shakingCellIndices, displayLootByCell, invasionMonsters, defenseFacilities }, ref) => {
     const cellRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
     useImperativeHandle(ref, () => ({
@@ -88,11 +91,125 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
       );
     }
 
+    // 渲染防御设施（在棋盘外围）
+    const renderDefenseFacilities = () => {
+      if (!defenseFacilities || defenseFacilities.size === 0) return null;
+
+      const facilityElements: JSX.Element[] = [];
+      const boardWidth = 6;
+      const boardHeight = 4;
+      const cellSize = 80; // 每个格子80px（与ExplorationCell一致）
+
+      for (const facility of defenseFacilities.values()) {
+        const { x, y } = facility.position;
+        // 计算设施在屏幕上的位置
+        let left = 0;
+        let top = 0;
+
+        if (y === -1) {
+          // 上边缘
+          left = x * cellSize + 4;
+          top = -cellSize + 4;
+        } else if (y === boardHeight) {
+          // 下边缘
+          left = x * cellSize + 4;
+          top = boardHeight * cellSize + 4;
+        } else if (x === -1) {
+          // 左边缘
+          left = -cellSize + 4;
+          top = y * cellSize + 4;
+        } else if (x === boardWidth) {
+          // 右边缘
+          left = boardWidth * cellSize + 4;
+          top = y * cellSize + 4;
+        }
+
+        facilityElements.push(
+          <div
+            key={facility.id}
+            style={{
+              position: 'absolute',
+              left: `${left}px`,
+              top: `${top}px`,
+              width: cellSize - 8,
+              height: cellSize - 8,
+              background: facility.currentHp <= 0 ? '#f44' : '#4af',
+              border: '2px solid #fff',
+              borderRadius: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              color: '#fff',
+              zIndex: 10,
+            }}
+            title={`${facility.config.名称Key} (Lv.${facility.level}) - HP: ${facility.currentHp}/${facility.config.最大血量}`}
+          >
+            <div>🛡️</div>
+            <div style={{ fontSize: 8, marginTop: 2 }}>
+              {facility.currentHp}/{facility.config.最大血量}
+            </div>
+          </div>
+        );
+      }
+
+      return facilityElements;
+    };
+
+    // 渲染入侵怪物（在棋盘上）
+    const renderInvasionMonsters = () => {
+      if (!invasionMonsters || invasionMonsters.size === 0) return null;
+
+      const monsterElements: JSX.Element[] = [];
+      const cellSize = 80; // 每个格子80px（与ExplorationCell一致）
+
+      for (const monster of invasionMonsters.values()) {
+        if (!monster.currentPosition || monster.currentHp <= 0) continue;
+
+        const { x, y } = monster.currentPosition;
+        const left = x * cellSize + 4;
+        const top = y * cellSize + 4;
+
+        monsterElements.push(
+          <div
+            key={monster.id}
+            style={{
+              position: 'absolute',
+              left: `${left}px`,
+              top: `${top}px`,
+              width: cellSize - 8,
+              height: cellSize - 8,
+              background: monster.monsterType === 'ranged' ? '#fa4' : '#f44',
+              border: '2px solid #fff',
+              borderRadius: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              color: '#fff',
+              zIndex: 5,
+            }}
+            title={`入侵怪物 - HP: ${monster.currentHp}/${monster.config.血量}`}
+          >
+            <div>{monster.monsterType === 'ranged' ? '🏹' : '⚔️'}</div>
+            <div style={{ fontSize: 8, marginTop: 2 }}>
+              {monster.currentHp}/{monster.config.血量}
+            </div>
+          </div>
+        );
+      }
+
+      return monsterElements;
+    };
+
     return (
       <div>
         <h2>探索棋盘 - 第 {layer.layerIndex} 层</h2>
         <div
           style={{
+            position: 'relative',
             display: 'inline-block',
             border: '1px solid #555',
             padding: 4,
@@ -100,6 +217,10 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
           }}
         >
           {rows}
+          {/* 渲染入侵怪物 */}
+          {renderInvasionMonsters()}
+          {/* 渲染防御设施 */}
+          {renderDefenseFacilities()}
         </div>
       </div>
     );

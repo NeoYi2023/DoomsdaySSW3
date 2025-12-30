@@ -10,10 +10,24 @@ import { LootAnimation } from './components/LootAnimation';
 import { QuestPanel } from './components/QuestPanel';
 import { ChapterStoryPanel } from './components/ChapterStoryPanel';
 import { SettingsPanel } from './components/SettingsPanel';
+import { InvasionBattlePanel } from './components/InvasionBattlePanel';
+import { DefenseFacilityPanel } from './components/DefenseFacilityPanel';
+import { OreChoicePanel } from './components/OreChoicePanel';
 import { audioSystem } from './core/AudioSystem';
 import { generateExplorationBoardLayer } from './core/ExplorationSystem';
 import { resolveBattleTurn, processGarbageAfterBattle } from './core/BattleSystem';
 import { distributeLootToExplorers, addToExplorerInventory } from './core/InventorySystem';
+import {
+  checkInvasionTrigger,
+  spawnInvasionMonsters,
+  processInvasionMonsterMovement,
+  calculateVibrationIncrease,
+} from './core/InvasionSystem';
+import {
+  processInvasionBattleTurn,
+  createInvasionBattleState,
+  type InvasionBattleState,
+} from './core/InvasionBattleSystem';
 import { MapSystem, type WorldPosition } from './core/MapSystem';
 import { QuestSystem } from './core/QuestSystem';
 import { ChapterSystem } from './core/ChapterSystem';
@@ -25,6 +39,9 @@ import type {
   ExplorationBoardLayer,
   MapCellRuntime,
   EquipmentSlotType,
+  ProspectingShip,
+  DefenseFacility,
+  InvasionState,
 } from './types/gameTypes';
 import type {
   ExplorerConfigEntry,
@@ -37,6 +54,10 @@ import type {
   ChapterConfigEntry,
   EquipmentConfigEntry,
   ShelterLevelConfigEntry,
+  ShipConfigEntry,
+  DefenseFacilityConfigEntry,
+  ItemConfigEntry,
+  OreChoiceConfigEntry,
 } from './types/configTypes';
 import explorersConfig from '../configs/json/ExplorerConfig.json';
 import monstersConfig from '../configs/json/MonsterConfig.json';
@@ -49,6 +70,10 @@ import questsConfig from '../configs/json/QuestConfig.json';
 import chaptersConfig from '../configs/json/ChapterConfig.json';
 import equipmentsConfig from '../configs/json/EquipmentConfig.json';
 import shelterLevelsConfig from '../configs/json/ShelterLevelConfig.json';
+import shipsConfig from '../configs/json/ShipConfig.json';
+import defenseFacilitiesConfig from '../configs/json/DefenseFacilityConfig.json';
+import itemsConfig from '../configs/json/ItemConfig.json';
+import oreChoicesConfig from '../configs/json/OreChoiceConfig.json';
 
 type GameState = 'map' | 'traveling' | 'exploration';
 
@@ -64,6 +89,10 @@ export function App() {
   const chaptersConfigArr = chaptersConfig as ChapterConfigEntry[];
   const equipmentsConfigArr = equipmentsConfig as EquipmentConfigEntry[];
   const shelterLevelsConfigArr = shelterLevelsConfig as ShelterLevelConfigEntry[];
+  const shipsConfigArr = shipsConfig as ShipConfigEntry[];
+  const defenseFacilitiesConfigArr = defenseFacilitiesConfig as DefenseFacilityConfigEntry[];
+  const itemsConfigArr = itemsConfig as ItemConfigEntry[];
+  const oreChoicesConfigArr = oreChoicesConfig as OreChoiceConfigEntry[];
 
   const [gameState, setGameState] = useState<GameState>('map');
   const [currentRound, setCurrentRound] = useState(1);
@@ -95,6 +124,19 @@ export function App() {
   const [travelPath, setTravelPath] = useState<WorldPosition[]>([]);
   const [targetShelter, setTargetShelter] = useState<WorldPosition | null>(null); // 目标避难所位置（如果正在返回避难所）
   const travelTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 入侵系统相关状态
+  const [vibrationValue, setVibrationValue] = useState(0); // 当前震动值
+  const [prospectingShip, setProspectingShip] = useState<ProspectingShip | null>(null); // 勘探船状态
+  const [invasionState, setInvasionState] = useState<InvasionState | null>(null); // 入侵战斗状态
+  const [defenseFacilities, setDefenseFacilities] = useState<Map<string, DefenseFacility>>(new Map()); // 防御设施列表
+  const invasionBattleIntervalRef = useRef<NodeJS.Timeout | null>(null); // 入侵战斗循环定时器
+  const [defenseFacilityPanelVisible, setDefenseFacilityPanelVisible] = useState(false); // 防御设施面板可见性
+  
+  // 矿石选择系统相关状态
+  const [oreChoicePanelVisible, setOreChoicePanelVisible] = useState(false); // 矿石选择面板可见性
+  const [activeOreChoices, setActiveOreChoices] = useState<string[]>([]); // 累积的矿石选项ID列表（持续影响所有层）
+  const pendingExplorersRef = useRef<Map<string, Explorer> | null>(null); // 保存待进入下一层时的探索者状态
   
   // 地图格子运行时状态（包含探索进度）
   const [mapCellsRuntime, setMapCellsRuntime] = useState<MapCellRuntime[]>(() => {
@@ -170,6 +212,21 @@ export function App() {
 
   // 章节系统
   const chapterSystemRef = useRef<ChapterSystem | null>(null);
+
+  // 初始化勘探船
+  useEffect(() => {
+    if (prospectingShip === null && shipsConfigArr.length > 0) {
+      const defaultShipConfig = shipsConfigArr[0];
+      const ship: ProspectingShip = {
+        shipId: defaultShipConfig.ID,
+        config: defaultShipConfig,
+        currentHp: defaultShipConfig.初始血量,
+        maxHp: defaultShipConfig.最大血量,
+        baseVibrationPerRound: defaultShipConfig.每回合震动值增加值,
+      };
+      setProspectingShip(ship);
+    }
+  }, [shipsConfigArr]);
 
   // 初始化章节系统
   useEffect(() => {
@@ -644,6 +701,8 @@ export function App() {
     setCurrentLayer(1); // 重置为第1层
     setTeamPosition(null);
     setTravelPath([]);
+    setVibrationValue(0); // 重置震动值
+    setActiveOreChoices([]); // 重置矿石选择列表
     setGameState('exploration');
   }, [selectedPoint, selectedExplorerIds, explorersConfigArr, monstersConfigArr, garbagesConfigArr, allExplorersEquipment]);
 
@@ -752,6 +811,11 @@ export function App() {
   const handleNextRound = () => {
     if (!boardLayer || !selectedPoint) return;
     
+    // 如果正在进行入侵战斗，不允许推进回合
+    if (invasionState?.isActive) {
+      alert('正在进行怪物入侵战斗，无法推进回合！');
+      return;
+    }
     
     // 0. 回合开始时清空临时背包并锁定
     setTempInventory([]);
@@ -764,6 +828,64 @@ export function App() {
       updatedExplorers.set(id, { ...explorer, currentStamina: newStamina });
     }
     setExplorers(updatedExplorers);
+    
+    // 0.2 计算震动值增加（勘探船每回合增加值 + 道具触发增加值）
+    if (prospectingShip && selectedPoint.震动值最大值) {
+      const baseIncrease = prospectingShip.baseVibrationPerRound;
+      // 检查是否有道具触发震动值增加（这里简化处理，后续可以根据实际道具使用情况添加）
+      let itemVibrationIncrease = 0;
+      // TODO: 检查道具使用情况，累加震动值增加值
+      
+      const vibrationIncrease = calculateVibrationIncrease(baseIncrease, itemVibrationIncrease);
+      const newVibrationValue = Math.min(
+        vibrationValue + vibrationIncrease,
+        selectedPoint.震动值最大值,
+      );
+      setVibrationValue(newVibrationValue);
+      
+      // 检查是否触发怪物入侵
+      if (checkInvasionTrigger(newVibrationValue, selectedPoint.震动值最大值)) {
+        // 触发怪物入侵
+        setProspectingShip((currentShip) => {
+          if (!currentShip) return currentShip;
+          
+          const invasionMonsters = spawnInvasionMonsters(
+            selectedPoint,
+            monstersConfigArr,
+            currentShip.config,
+          );
+          
+          // 处理怪物移动到边缘
+          const movedMonsters = processInvasionMonsterMovement(invasionMonsters);
+          
+          // 创建入侵战斗状态（使用最新的防御设施状态）
+          setDefenseFacilities((currentFacilities) => {
+            const battleState = createInvasionBattleState(
+              currentShip,
+              movedMonsters,
+              currentFacilities,
+            );
+            
+            setInvasionState({
+              isActive: true,
+              invasionMonsters: movedMonsters,
+              facilities: currentFacilities,
+              startTime: Date.now(),
+            });
+            
+            // 启动即时制战斗循环
+            startInvasionBattle(battleState);
+            
+            alert('震动值达到最大值！怪物入侵开始！');
+            return currentFacilities;
+          });
+          
+          return currentShip;
+        });
+        
+        return; // 暂停回合制战斗
+      }
+    }
     
     // 1. 先结算战斗（使用更新后的explorers）
     const battleResult = resolveBattleTurn(boardLayer, updatedExplorers, monsters);
@@ -810,60 +932,96 @@ export function App() {
     
     // 如果完成当前层且未达到最大层数，进入下一层
     if (!hasMonstersOnBoard && hasAliveExplorers && currentLayer < selectedPoint.最大层数) {
+      // 保存当前的探索者状态，供选择后使用
+      pendingExplorersRef.current = garbageResult.explorers;
+      // 显示矿石选择面板（让玩家选择下一层的矿石类型）
+      setOreChoicePanelVisible(true);
+      return; // 等待玩家选择后再生成新层
+    }
+  
+  // 处理矿石选择，生成下一层
+  const handleOreChoice = (choiceId: string) => {
+    if (!selectedPoint) return;
+    
+    setOreChoicePanelVisible(false);
+    
+    // 使用保存的探索者状态（如果存在），否则使用当前状态
+    const explorersToUse = pendingExplorersRef.current || explorers;
+    pendingExplorersRef.current = null; // 清空ref
+    
+    // 将新选择的选项ID添加到累积列表中（如果提供了choiceId）
+    setActiveOreChoices((prevChoices) => {
       const nextLayer = currentLayer + 1;
+      const newChoices = choiceId ? [...prevChoices, choiceId] : prevChoices;
       
+      // 根据累积的选项ID列表，构建选项配置数组
+      const oreChoicesConfig = newChoices
+        .map((id) => {
+          const choice = oreChoicesConfigArr.find((c) => c.ID === id);
+          if (!choice) return null;
+          
+          const affectedOreIds = Array.isArray(choice.影响的矿石ID列表)
+            ? choice.影响的矿石ID列表
+            : choice.影响的矿石ID列表?.split('|').filter(Boolean) || [];
+          
+          return {
+            affectedOreIds,
+            weightMultiplier: choice.权重调整,
+            maxCount: choice.数量上限,
+          };
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null);
       
-      // 重新生成下一层的棋盘（随机位置）
-      const aliveExplorers = Array.from(garbageResult.explorers.values()).filter(e => e.currentHp > 0);
+      // 获取当前存活的探索者
+      const aliveExplorers = Array.from(explorersToUse.values()).filter((e) => e.currentHp > 0);
       
-      
+      // 生成下一层棋盘，应用所有累积的矿石选择影响
       const boardResult = generateExplorationBoardLayer({
         pointConfig: selectedPoint,
         explorers: aliveExplorers,
         monsterConfigs: monstersConfigArr,
         garbageConfigs: garbagesConfigArr,
         layerIndex: nextLayer,
+        oreChoices: oreChoicesConfig.length > 0 ? oreChoicesConfig : undefined,
       });
-      
-      
-      // 根据棋盘上的怪物创建 Monster 实例
-      const { monsters: newMonsters, updatedBoard } = createMonstersFromBoard(
-        boardResult.layer,
-        monstersConfigArr,
-        nextLayer,
-      );
-      
-      
-      // 更新探索进度
-      const pointPos = findPointPosition(selectedPoint.ID);
-      if (pointPos) {
-        setMapCellsRuntime((prev) => {
-          return prev.map((cell) => {
-            if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
-              // 计算新的探索进度
-              const newProgress = Math.round((nextLayer / selectedPoint.最大层数) * 100);
-              return { ...cell, explorationProgress: newProgress };
-            }
-            return cell;
-          });
+    
+    // 根据棋盘上的怪物创建 Monster 实例
+    const { monsters: newMonsters, updatedBoard } = createMonstersFromBoard(
+      boardResult.layer,
+      monstersConfigArr,
+      nextLayer,
+    );
+    
+    // 更新探索进度
+    const pointPos = findPointPosition(selectedPoint.ID);
+    if (pointPos) {
+      setMapCellsRuntime((prev) => {
+        return prev.map((cell) => {
+          if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
+            // 计算新的探索进度
+            const newProgress = Math.round((nextLayer / selectedPoint.最大层数) * 100);
+            return { ...cell, explorationProgress: newProgress };
+          }
+          return cell;
         });
-      }
-      
-      setExplorers(garbageResult.explorers);
-      setMonsters(newMonsters);
-      setBoardLayer(updatedBoard);
-      setCurrentLayer(nextLayer);
-      const nextRound = currentRound + 1;
-      const nextDay = Math.floor(nextRound / 48) + 1;
-      setCurrentRound(nextRound);
-      setCurrentDay(nextDay);
-      // 更新任务系统回合数
-      if (questSystemRef.current) {
-        questSystemRef.current.updateRound(nextRound, nextDay);
-        setQuests(questSystemRef.current.getAcceptedQuests());
-      }
-      return;
+      });
     }
+    
+    setExplorers(explorersToUse); // 更新探索者状态
+    setMonsters(newMonsters);
+    setBoardLayer(updatedBoard);
+    setCurrentLayer(nextLayer);
+    
+    const nextRound = currentRound + 1;
+    const nextDay = Math.floor(nextRound / 48) + 1;
+    setCurrentRound(nextRound);
+    setCurrentDay(nextDay);
+    // 更新任务系统回合数
+    if (questSystemRef.current) {
+      questSystemRef.current.updateRound(nextRound, nextDay);
+      setQuests(questSystemRef.current.getAcceptedQuests());
+    }
+  };
     
     // 如果达到最大层数，强制结束探索
     if (currentLayer >= selectedPoint.最大层数 && !hasMonstersOnBoard && hasAliveExplorers) {
@@ -942,11 +1100,110 @@ export function App() {
     setCurrentRound((r) => r + 1);
   };
 
+  // 使用ref保存战斗状态，避免闭包问题
+  const invasionBattleStateRef = useRef<InvasionBattleState | null>(null);
+  const prospectingShipRef = useRef<ProspectingShip | null>(null);
+
+  // 更新勘探船ref
+  useEffect(() => {
+    prospectingShipRef.current = prospectingShip;
+  }, [prospectingShip]);
+
+  // 启动入侵战斗循环
+  const startInvasionBattle = useCallback((battleState: InvasionBattleState) => {
+    if (invasionBattleIntervalRef.current) {
+      clearInterval(invasionBattleIntervalRef.current);
+    }
+
+    invasionBattleStateRef.current = battleState;
+
+    invasionBattleIntervalRef.current = setInterval(() => {
+      const currentState = invasionBattleStateRef.current;
+      if (!currentState) return;
+
+      const currentTime = Date.now();
+      const result = processInvasionBattleTurn(currentState, currentTime);
+
+      // 更新状态
+      setProspectingShip(result.updatedState.ship);
+      setDefenseFacilities(result.updatedState.facilities);
+      setInvasionState((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          invasionMonsters: result.updatedState.monsters,
+          facilities: result.updatedState.facilities,
+        };
+      });
+
+      // 检查游戏失败
+      if (result.shipDestroyed) {
+        if (invasionBattleIntervalRef.current) {
+          clearInterval(invasionBattleIntervalRef.current);
+          invasionBattleIntervalRef.current = null;
+        }
+        invasionBattleStateRef.current = null;
+        setInvasionState((prev) => {
+          if (!prev) return null;
+          return { ...prev, isActive: false };
+        });
+        alert('勘探船被摧毁！游戏失败！');
+        // TODO: 显示游戏失败界面
+        return;
+      }
+
+      // 检查胜利
+      if (result.allMonstersDefeated) {
+        if (invasionBattleIntervalRef.current) {
+          clearInterval(invasionBattleIntervalRef.current);
+          invasionBattleIntervalRef.current = null;
+        }
+        invasionBattleStateRef.current = null;
+        setInvasionState((prev) => {
+          if (!prev) return null;
+          return { ...prev, isActive: false };
+        });
+        alert('成功击退怪物入侵！');
+        // 重置震动值
+        setVibrationValue(0);
+        return;
+      }
+
+      // 更新战斗状态ref
+      invasionBattleStateRef.current = result.updatedState;
+    }, 100); // 每100ms执行一次战斗计算
+  }, []);
+
+  // 停止入侵战斗循环
+  const stopInvasionBattle = useCallback(() => {
+    if (invasionBattleIntervalRef.current) {
+      clearInterval(invasionBattleIntervalRef.current);
+      invasionBattleIntervalRef.current = null;
+    }
+    invasionBattleStateRef.current = null;
+    setInvasionState((prev) => {
+      if (!prev) return null;
+      return { ...prev, isActive: false };
+    });
+  }, []);
+
+
+  // 清理入侵战斗循环
+  useEffect(() => {
+    return () => {
+      if (invasionBattleIntervalRef.current) {
+        clearInterval(invasionBattleIntervalRef.current);
+      }
+    };
+  }, []);
+
   const handleBackToMap = () => {
     if (travelTimerRef.current) {
       clearTimeout(travelTimerRef.current);
       travelTimerRef.current = null;
     }
+    // 停止入侵战斗
+    stopInvasionBattle();
     // 保留 teamPosition 和 explorers，只清除探索相关状态
     setGameState('map');
     setSelectedPoint(null);
@@ -954,6 +1211,7 @@ export function App() {
     setMonsters(new Map());
     setCurrentLayer(1); // 重置层数
     setTravelPath([]);
+    setVibrationValue(0); // 重置震动值
     // 如果在探索点，将 teamPosition 设为该探索点的位置
     if (selectedPoint) {
       const pos = findPointPosition(selectedPoint.ID);
@@ -1035,6 +1293,14 @@ export function App() {
       )}
       {gameState === 'exploration' && selectedPoint && boardLayer && (
         <>
+          {/* 入侵战斗面板 */}
+          <InvasionBattlePanel
+            invasionState={invasionState}
+            ship={prospectingShip}
+            facilities={defenseFacilities}
+            vibrationValue={vibrationValue}
+            maxVibration={selectedPoint.震动值最大值 ?? 100}
+          />
           <p>
             当前探索点：{getText(selectedPoint.名称Key ?? selectedPoint.ID)} | 回合：{currentRound}
           </p>
@@ -1042,14 +1308,25 @@ export function App() {
             <button onClick={handleBackToMap} style={{ marginRight: 8 }}>
               返回大地图
             </button>
-            <button onClick={handleNextRound} style={{ marginRight: 8 }}>
-              下一回合（结算战斗）
+            <button 
+              onClick={handleNextRound} 
+              style={{ marginRight: 8 }}
+              disabled={invasionState?.isActive ?? false}
+            >
+              {invasionState?.isActive ? '防御中...' : '下一回合（结算战斗）'}
             </button>
             <button 
               ref={inventoryButtonRef}
               onClick={() => setInventoryPanelVisible(true)}
+              style={{ marginRight: 8 }}
             >
               背包
+            </button>
+            <button 
+              onClick={() => setDefenseFacilityPanelVisible(true)}
+              disabled={invasionState?.isActive ?? false}
+            >
+              防御设施
             </button>
           </div>
           <ExplorationBoard
@@ -1061,6 +1338,8 @@ export function App() {
             resourceConfigs={resourcesConfigArr}
             shakingCellIndices={shakingCellIndices}
             displayLootByCell={displayLootByCell}
+            invasionMonsters={invasionState?.invasionMonsters}
+            defenseFacilities={defenseFacilities}
           />
           {/* 飞行动画 */}
           {activeLootAnimations.map((anim) => {
@@ -1355,6 +1634,52 @@ export function App() {
           setGameState('map');
         }}
         onTransfer={handleTransferResources}
+      />
+      <OreChoicePanel
+        visible={oreChoicePanelVisible}
+        choices={oreChoicesConfigArr.slice(0, 3)} // 显示前三个选项
+        onSelect={handleOreChoice}
+        onCancel={() => {
+          // 如果取消选择，仍然进入下一层（使用默认配置）
+          handleOreChoice('');
+        }}
+      />
+      <DefenseFacilityPanel
+        visible={defenseFacilityPanelVisible}
+        facilities={defenseFacilities}
+        facilityConfigs={defenseFacilitiesConfigArr}
+        warehouse={shelterWarehouse}
+        onClose={() => setDefenseFacilityPanelVisible(false)}
+        onBuild={(facility, updatedWarehouse) => {
+          setDefenseFacilities((prev) => {
+            const updated = new Map(prev);
+            updated.set(facility.id, facility);
+            return updated;
+          });
+          setShelterWarehouse(updatedWarehouse);
+          // 更新入侵状态中的设施列表
+          setInvasionState((prev) => {
+            if (!prev) return null;
+            const updatedFacilities = new Map(prev.facilities);
+            updatedFacilities.set(facility.id, facility);
+            return { ...prev, facilities: updatedFacilities };
+          });
+        }}
+        onUpgrade={(facilityId, updatedFacility, updatedWarehouse) => {
+          setDefenseFacilities((prev) => {
+            const updated = new Map(prev);
+            updated.set(facilityId, updatedFacility);
+            return updated;
+          });
+          setShelterWarehouse(updatedWarehouse);
+          // 更新入侵状态中的设施列表
+          setInvasionState((prev) => {
+            if (!prev) return null;
+            const updatedFacilities = new Map(prev.facilities);
+            updatedFacilities.set(facilityId, updatedFacility);
+            return { ...prev, facilities: updatedFacilities };
+          });
+        }}
       />
     </div>
   );

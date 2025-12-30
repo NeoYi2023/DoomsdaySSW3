@@ -1,0 +1,11 @@
+[
+  {
+    "ID": "ship_default",
+    "名称Key": "ship.default.name",
+    "描述Key": "ship.default.desc",
+    "初始血量": 100,
+    "最大血量": 100,
+    "每回合震动值增加值": 1
+  }
+]
+

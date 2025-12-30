@@ -1,0 +1,4 @@
+ID,名称Key,描述Key,设施类型,初始血量,最大血量,攻击力,攻击范围,攻击速度,建造消耗资源列表,升级消耗资源列表
+facility_turret_basic,facility.turret.basic.name,facility.turret.basic.desc,炮台,50,50,5,3,1,resource_metal_10|resource_food_5,resource_metal_5|resource_food_2
+facility_shield_basic,facility.shield.basic.name,facility.shield.basic.desc,护盾,100,100,0,0,0,resource_metal_15|resource_food_10,resource_metal_8|resource_food_5
+

@@ -1,0 +1,5 @@
+ID,名称Key,描述Key,影响的矿石ID列表,权重调整,数量上限,图标Key
+ore_choice_food_focus,ore.choice.food_focus.name,ore.choice.food_focus.desc,garbage_10001|garbage_10002|garbage_10003|garbage_10004|garbage_10005|garbage_10006|garbage_10007|garbage_10008|garbage_food_1|garbage_food_2|garbage_food_3|garbage_food_4|garbage_food_5,2.0,12,
+ore_choice_material_focus,ore.choice.material_focus.name,ore.choice.material_focus.desc,garbage_20001|garbage_20002|garbage_20003|garbage_20004|garbage_20005,2.0,10,
+ore_choice_balanced,ore.choice.balanced.name,ore.choice.balanced.desc,garbage_10001|garbage_10002|garbage_10003|garbage_20001|garbage_20002|garbage_20003,1.5,15,
+
