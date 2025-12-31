@@ -7,10 +7,16 @@
     "初始血量": 50,
     "最大血量": 50,
     "攻击力": 5,
-    "攻击范围": 3,
-    "攻击速度": 1,
-    "建造消耗资源列表": "resource_metal_10|resource_food_5",
-    "升级消耗资源列表": "resource_metal_5|resource_food_2"
+    "攻击范围": "3",
+    "攻击速度": "1",
+    "建造消耗资源列表": [
+      "resource_metal_10",
+      "resource_food_5"
+    ],
+    "升级消耗资源列表": [
+      "resource_metal_5",
+      "resource_food_2"
+    ]
   },
   {
     "ID": "facility_shield_basic",
@@ -20,10 +26,15 @@
     "初始血量": 100,
     "最大血量": 100,
     "攻击力": 0,
-    "攻击范围": 0,
-    "攻击速度": 0,
-    "建造消耗资源列表": "resource_metal_15|resource_food_10",
-    "升级消耗资源列表": "resource_metal_8|resource_food_5"
+    "攻击范围": "0",
+    "攻击速度": "0",
+    "建造消耗资源列表": [
+      "resource_metal_15",
+      "resource_food_10"
+    ],
+    "升级消耗资源列表": [
+      "resource_metal_8",
+      "resource_food_5"
+    ]
   }
 ]
-

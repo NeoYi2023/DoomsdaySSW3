@@ -36,15 +36,5 @@
     "使用效果数值": "1",
     "消耗条件": "天赋ID",
     "堆叠最大数量": 99
-  },
-  {
-    "ID": "item_vibration_trigger",
-    "名称Key": "item.vibration_trigger.name",
-    "描述Key": "item.vibration_trigger.desc",
-    "道具类型": "消耗品",
-    "使用效果类型": "增加震动值",
-    "使用效果数值": "5",
-    "增加震动值": 5,
-    "堆叠最大数量": 10
   }
 ]

@@ -32,7 +32,7 @@ export interface BattleTurnResult {
 }
 
 function getCoordsFromIndex(index: number): { x: number; y: number } {
-  const width = 6;
+  const width = 4;
   const x = index % width;
   const y = Math.floor(index / width);
   return { x, y };

@@ -77,7 +77,7 @@ export interface MapCellRuntime {
 }
 
 export interface ExplorationBoardCell {
-  index: number; // 0-23 for 6x4
+  index: number; // 0-23 for 4x6
   explorerId?: string;
   monsterId?: string;
   garbageId?: string;

@@ -86,7 +86,7 @@ function chooseWeighted<T extends { weight: number }>(items: T[]): T | null {
 }
 
 /**
- * 根据探索点配置生成一层 6x4 的探索棋盘：
+ * 根据探索点配置生成一层 4x6 的探索棋盘：
  * 1. 先放置角色（随机不重复格子）；
  * 2. 再根据 `棋盘出现内容` 的权重规则放置怪物和垃圾。
  */
@@ -96,7 +96,7 @@ export function generateExplorationBoardLayer(
   const { pointConfig, explorers, monsterConfigs, garbageConfigs, layerIndex, oreChoices } = input;
 
 
-  const totalCells = 6 * 4;
+  const totalCells = 4 * 6;
   const cells: ExplorationBoardCell[] = [];
   for (let i = 0; i < totalCells; i++) {
     cells.push({ index: i });

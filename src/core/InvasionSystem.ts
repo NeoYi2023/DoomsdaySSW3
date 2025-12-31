@@ -42,7 +42,7 @@ export function spawnInvasionMonsters(
 
   // 根据权重生成入侵怪物
   let monsterCounter = 0;
-  const totalCells = 6 * 4; // 探索棋盘大小
+  const totalCells = 4 * 6; // 探索棋盘大小
   const spawnCount = Math.min(monsterEntries.length, totalCells); // 最多生成棋盘大小的怪物数量
 
   for (let i = 0; i < spawnCount; i++) {
@@ -138,17 +138,17 @@ export function processInvasionMonsterMovement(
 
 /**
  * 找到最近的边缘位置
- * 探索棋盘为6×4，边缘位置定义：
- * - 上边缘：y = -1, x = 0-5
- * - 下边缘：y = 4, x = 0-5
- * - 左边缘：x = -1, y = 0-3
- * - 右边缘：x = 6, y = 0-3
+ * 探索棋盘为4×6，边缘位置定义：
+ * - 上边缘：y = -1, x = 0-3
+ * - 下边缘：y = 6, x = 0-3
+ * - 左边缘：x = -1, y = 0-5
+ * - 右边缘：x = 4, y = 0-5
  */
 function findNearestEdgePosition(
   currentPos: { x: number; y: number },
 ): { x: number; y: number } {
-  const boardWidth = 6;
-  const boardHeight = 4;
+  const boardWidth = 4;
+  const boardHeight = 6;
 
   // 计算到各边缘的距离
   const distances = [

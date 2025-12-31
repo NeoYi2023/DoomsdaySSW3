@@ -49,8 +49,8 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
       garbageMap.set(g.ID, g);
     }
 
-    const width = 6;
-    const height = 4;
+    const width = 4;
+    const height = 6;
 
     const rows: JSX.Element[] = [];
     for (let y = 0; y < height; y++) {
@@ -96,9 +96,10 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
       if (!defenseFacilities || defenseFacilities.size === 0) return null;
 
       const facilityElements: JSX.Element[] = [];
-      const boardWidth = 6;
-      const boardHeight = 4;
+      const boardWidth = 4;
+      const boardHeight = 6;
       const cellSize = 80; // 每个格子80px（与ExplorationCell一致）
+      const padding = 4; // 与棋盘容器的 padding 一致
 
       for (const facility of defenseFacilities.values()) {
         const { x, y } = facility.position;
@@ -108,20 +109,20 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
 
         if (y === -1) {
           // 上边缘
-          left = x * cellSize + 4;
-          top = -cellSize + 4;
+          left = x * cellSize + padding;
+          top = -cellSize + padding;
         } else if (y === boardHeight) {
           // 下边缘
-          left = x * cellSize + 4;
-          top = boardHeight * cellSize + 4;
+          left = x * cellSize + padding;
+          top = boardHeight * cellSize + padding;
         } else if (x === -1) {
           // 左边缘
-          left = -cellSize + 4;
-          top = y * cellSize + 4;
+          left = -cellSize + padding;
+          top = y * cellSize + padding;
         } else if (x === boardWidth) {
           // 右边缘
-          left = boardWidth * cellSize + 4;
-          top = y * cellSize + 4;
+          left = boardWidth * cellSize + padding;
+          top = y * cellSize + padding;
         }
 
         facilityElements.push(
@@ -163,13 +164,14 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
 
       const monsterElements: JSX.Element[] = [];
       const cellSize = 80; // 每个格子80px（与ExplorationCell一致）
+      const padding = 4; // 与棋盘容器的 padding 一致
 
       for (const monster of invasionMonsters.values()) {
         if (!monster.currentPosition || monster.currentHp <= 0) continue;
 
         const { x, y } = monster.currentPosition;
-        const left = x * cellSize + 4;
-        const top = y * cellSize + 4;
+        const left = x * cellSize + padding;
+        const top = y * cellSize + padding;
 
         monsterElements.push(
           <div
@@ -204,16 +206,33 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
       return monsterElements;
     };
 
+    // 计算棋盘尺寸
+    const cellSize = 80;
+    const boardWidth = width * cellSize;
+    const boardHeight = height * cellSize;
+    const padding = 4;
+    const totalWidth = boardWidth + padding * 2;
+    const totalHeight = boardHeight + padding * 2;
+
     return (
-      <div>
+      <div style={{ position: 'relative' }}>
         <h2>探索棋盘 - 第 {layer.layerIndex} 层</h2>
+        {/* 棋盘内容 */}
         <div
           style={{
             position: 'relative',
             display: 'inline-block',
             border: '1px solid #555',
-            padding: 4,
+            padding: padding,
             background: '#111',
+            width: boardWidth,
+            height: boardHeight,
+            // 将背景图作为棋盘背景
+            backgroundImage: 'url("/images/QiPan.png")',
+            backgroundSize: `${totalWidth}px ${totalHeight}px`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            zIndex: 1,
           }}
         >
           {rows}

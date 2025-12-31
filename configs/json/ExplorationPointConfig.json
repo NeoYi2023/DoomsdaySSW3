@@ -5,7 +5,6 @@
     "描述Key": "exploration_point_1_desc",
     "最大层数": 25,
     "探索难度": "简单",
-    "震动值最大值": 50,
     "棋盘出现内容": [
       "Garbage_garbage_10012_1",
       "Garbage_garbage_10012_1",
@@ -22,10 +21,6 @@
       "Garbage_garbage_20004_1",
       "Garbage_garbage_20005_1",
       "Garbage_garbage_20005_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_5"
     ]
   },
   {
@@ -34,7 +29,6 @@
     "描述Key": "exploration_point_2_desc",
     "最大层数": 26,
     "探索难度": "中等",
-    "震动值最大值": 60,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -51,10 +45,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_8"
     ]
   },
   {
@@ -63,7 +53,6 @@
     "描述Key": "exploration_point_3_desc",
     "最大层数": 27,
     "探索难度": "困难",
-    "震动值最大值": 70,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -80,10 +69,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_15",
-      "Monster_monster_zombie_2_10"
     ]
   },
   {
@@ -92,7 +77,6 @@
     "描述Key": "exploration_point_4_desc",
     "最大层数": 25,
     "探索难度": "简单",
-    "震动值最大值": 50,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -109,10 +93,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_5"
     ]
   },
   {
@@ -121,7 +101,6 @@
     "描述Key": "exploration_point_5_desc",
     "最大层数": 26,
     "探索难度": "中等",
-    "震动值最大值": 60,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -138,10 +117,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_8"
     ]
   },
   {
@@ -150,7 +125,6 @@
     "描述Key": "exploration_point_6_desc",
     "最大层数": 27,
     "探索难度": "困难",
-    "震动值最大值": 70,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -167,10 +141,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_15",
-      "Monster_monster_zombie_2_10"
     ]
   },
   {
@@ -179,7 +149,6 @@
     "描述Key": "exploration_point_7_desc",
     "最大层数": 25,
     "探索难度": "简单",
-    "震动值最大值": 50,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -196,10 +165,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_5"
     ]
   },
   {
@@ -208,7 +173,6 @@
     "描述Key": "exploration_point_8_desc",
     "最大层数": 26,
     "探索难度": "中等",
-    "震动值最大值": 60,
     "棋盘出现内容": [
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
@@ -225,10 +189,6 @@
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1",
       "Garbage_garbage_10002_1"
-    ],
-    "入侵怪物配置列表": [
-      "Monster_monster_zombie_3_10",
-      "Monster_monster_zombie_2_8"
     ]
   }
 ]

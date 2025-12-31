@@ -33,7 +33,7 @@ export function CharacterEquipmentPanel({
   onUnequip,
 }: CharacterEquipmentPanelProps) {
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/abcc8814-fa11-4364-ab2b-9cb14d54a4af',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CharacterEquipmentPanel:render',message:'组件渲染',data:{visible,explorersCount:explorers.length,explorerIds:explorers.map(e=>e.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7244/ingest/99dbafae-a66d-45a6-82ab-975b44cc18a0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CharacterEquipmentPanel:render',message:'组件渲染',data:{visible,explorersCount:explorers.length,explorerIds:explorers.map(e=>e.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
   // #endregion
   const [selectedExplorerId, setSelectedExplorerId] = useState<string>(
     explorers.length > 0 ? explorers[0].id : ''
@@ -43,7 +43,7 @@ export function CharacterEquipmentPanel({
 
   if (!visible || explorers.length === 0) {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/abcc8814-fa11-4364-ab2b-9cb14d54a4af',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CharacterEquipmentPanel:early return',message:'提前返回',data:{visible,explorersCount:explorers.length,reason:!visible?'visible=false':explorers.length===0?'explorers.length=0':'unknown'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/99dbafae-a66d-45a6-82ab-975b44cc18a0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CharacterEquipmentPanel:early return',message:'提前返回',data:{visible,explorersCount:explorers.length,reason:!visible?'visible=false':explorers.length===0?'explorers.length=0':'unknown'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     return null;
   }

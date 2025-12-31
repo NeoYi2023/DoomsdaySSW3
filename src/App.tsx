@@ -762,6 +762,91 @@ export function App() {
   };
 
   // 处理资源转移
+  // 处理矿石选择，生成下一层
+  const handleOreChoice = useCallback((choiceId: string) => {
+    if (!selectedPoint) return;
+    
+    setOreChoicePanelVisible(false);
+    
+    // 使用保存的探索者状态（如果存在），否则使用当前状态
+    const explorersToUse = pendingExplorersRef.current || explorers;
+    pendingExplorersRef.current = null; // 清空ref
+    
+    // 将新选择的选项ID添加到累积列表中（如果提供了choiceId）
+    const nextLayer = currentLayer + 1;
+    // 计算更新后的累积选项列表（先计算，再更新状态）
+    const updatedChoices = choiceId ? [...activeOreChoices, choiceId] : activeOreChoices;
+    setActiveOreChoices(updatedChoices);
+    
+    // 根据累积的选项ID列表，构建选项配置数组
+    const oreChoicesConfig = updatedChoices
+      .map((id) => {
+        const choice = oreChoicesConfigArr.find((c) => c.ID === id);
+        if (!choice) return null;
+        
+        const affectedOreIds = Array.isArray(choice.影响的矿石ID列表)
+          ? choice.影响的矿石ID列表
+          : choice.影响的矿石ID列表?.split('|').filter(Boolean) || [];
+        
+        return {
+          affectedOreIds,
+          weightMultiplier: choice.权重调整,
+          maxCount: choice.数量上限,
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+    
+    // 获取当前存活的探索者
+    const aliveExplorers = Array.from(explorersToUse.values()).filter((e) => e.currentHp > 0);
+    
+    // 生成下一层棋盘，应用所有累积的矿石选择影响
+    const boardResult = generateExplorationBoardLayer({
+      pointConfig: selectedPoint,
+      explorers: aliveExplorers,
+      monsterConfigs: monstersConfigArr,
+      garbageConfigs: garbagesConfigArr,
+      layerIndex: nextLayer,
+      oreChoices: oreChoicesConfig.length > 0 ? oreChoicesConfig : undefined,
+    });
+
+    // 根据棋盘上的怪物创建 Monster 实例
+    const { monsters: newMonsters, updatedBoard } = createMonstersFromBoard(
+      boardResult.layer,
+      monstersConfigArr,
+      nextLayer,
+    );
+    
+    // 更新探索进度
+    const pointPos = findPointPosition(selectedPoint.ID);
+    if (pointPos) {
+      setMapCellsRuntime((prev) => {
+        return prev.map((cell) => {
+          if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
+            // 计算新的探索进度
+            const newProgress = Math.round((nextLayer / selectedPoint.最大层数) * 100);
+            return { ...cell, explorationProgress: newProgress };
+          }
+          return cell;
+        });
+      });
+    }
+    
+    setExplorers(explorersToUse); // 更新探索者状态
+    setMonsters(newMonsters);
+    setBoardLayer(updatedBoard);
+    setCurrentLayer(nextLayer);
+    
+    const nextRound = currentRound + 1;
+    const nextDay = Math.floor(nextRound / 48) + 1;
+    setCurrentRound(nextRound);
+    setCurrentDay(nextDay);
+    // 更新任务系统回合数
+    if (questSystemRef.current) {
+      questSystemRef.current.updateRound(nextRound, nextDay);
+      setQuests(questSystemRef.current.getAcceptedQuests());
+    }
+  }, [selectedPoint, currentLayer, activeOreChoices, explorers, oreChoicesConfigArr, monstersConfigArr, garbagesConfigArr, currentRound]);
+
   const handleTransferResources = (selectedItems: ItemStack[]) => {
     // 从所有角色背包中移除选中的资源
     const updatedExplorers = new Map<string, Explorer>();
@@ -938,90 +1023,6 @@ export function App() {
       setOreChoicePanelVisible(true);
       return; // 等待玩家选择后再生成新层
     }
-  
-  // 处理矿石选择，生成下一层
-  const handleOreChoice = (choiceId: string) => {
-    if (!selectedPoint) return;
-    
-    setOreChoicePanelVisible(false);
-    
-    // 使用保存的探索者状态（如果存在），否则使用当前状态
-    const explorersToUse = pendingExplorersRef.current || explorers;
-    pendingExplorersRef.current = null; // 清空ref
-    
-    // 将新选择的选项ID添加到累积列表中（如果提供了choiceId）
-    setActiveOreChoices((prevChoices) => {
-      const nextLayer = currentLayer + 1;
-      const newChoices = choiceId ? [...prevChoices, choiceId] : prevChoices;
-      
-      // 根据累积的选项ID列表，构建选项配置数组
-      const oreChoicesConfig = newChoices
-        .map((id) => {
-          const choice = oreChoicesConfigArr.find((c) => c.ID === id);
-          if (!choice) return null;
-          
-          const affectedOreIds = Array.isArray(choice.影响的矿石ID列表)
-            ? choice.影响的矿石ID列表
-            : choice.影响的矿石ID列表?.split('|').filter(Boolean) || [];
-          
-          return {
-            affectedOreIds,
-            weightMultiplier: choice.权重调整,
-            maxCount: choice.数量上限,
-          };
-        })
-        .filter((c): c is NonNullable<typeof c> => c !== null);
-      
-      // 获取当前存活的探索者
-      const aliveExplorers = Array.from(explorersToUse.values()).filter((e) => e.currentHp > 0);
-      
-      // 生成下一层棋盘，应用所有累积的矿石选择影响
-      const boardResult = generateExplorationBoardLayer({
-        pointConfig: selectedPoint,
-        explorers: aliveExplorers,
-        monsterConfigs: monstersConfigArr,
-        garbageConfigs: garbagesConfigArr,
-        layerIndex: nextLayer,
-        oreChoices: oreChoicesConfig.length > 0 ? oreChoicesConfig : undefined,
-      });
-    
-    // 根据棋盘上的怪物创建 Monster 实例
-    const { monsters: newMonsters, updatedBoard } = createMonstersFromBoard(
-      boardResult.layer,
-      monstersConfigArr,
-      nextLayer,
-    );
-    
-    // 更新探索进度
-    const pointPos = findPointPosition(selectedPoint.ID);
-    if (pointPos) {
-      setMapCellsRuntime((prev) => {
-        return prev.map((cell) => {
-          if (cell.x === pointPos.x && cell.y === pointPos.y && cell.explorationPointId === selectedPoint.ID) {
-            // 计算新的探索进度
-            const newProgress = Math.round((nextLayer / selectedPoint.最大层数) * 100);
-            return { ...cell, explorationProgress: newProgress };
-          }
-          return cell;
-        });
-      });
-    }
-    
-    setExplorers(explorersToUse); // 更新探索者状态
-    setMonsters(newMonsters);
-    setBoardLayer(updatedBoard);
-    setCurrentLayer(nextLayer);
-    
-    const nextRound = currentRound + 1;
-    const nextDay = Math.floor(nextRound / 48) + 1;
-    setCurrentRound(nextRound);
-    setCurrentDay(nextDay);
-    // 更新任务系统回合数
-    if (questSystemRef.current) {
-      questSystemRef.current.updateRound(nextRound, nextDay);
-      setQuests(questSystemRef.current.getAcceptedQuests());
-    }
-  };
     
     // 如果达到最大层数，强制结束探索
     if (currentLayer >= selectedPoint.最大层数 && !hasMonstersOnBoard && hasAliveExplorers) {
@@ -1220,7 +1221,7 @@ export function App() {
   };
 
   return (
-    <div style={{ padding: 16, fontFamily: 'monospace', color: '#fff', background: '#000', minHeight: '100vh', position: 'relative' }}>
+    <div className="game-container" style={{ padding: 16, fontFamily: 'monospace', color: '#fff', background: '#000', position: 'relative' }}>
       <h1>DoomsdaySSW2 调试入口</h1>
       {/* 设置按钮 - 右上角 */}
       <button
@@ -1249,11 +1250,11 @@ export function App() {
             <button
               onClick={() => {
                 // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/abcc8814-fa11-4364-ab2b-9cb14d54a4af',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:角色装备按钮onClick',message:'按钮点击',data:{currentVisible:characterEquipmentPanelVisible,explorersCount:explorersArray.length,gameState},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7244/ingest/99dbafae-a66d-45a6-82ab-975b44cc18a0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:角色装备按钮onClick',message:'按钮点击',data:{currentVisible:characterEquipmentPanelVisible,explorersCount:explorersArray.length,gameState},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
                 setCharacterEquipmentPanelVisible(true);
                 // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/abcc8814-fa11-4364-ab2b-9cb14d54a4af',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:角色装备按钮onClick',message:'状态更新后',data:{setToTrue:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7244/ingest/99dbafae-a66d-45a6-82ab-975b44cc18a0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:角色装备按钮onClick',message:'状态更新后',data:{setToTrue:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
                 // #endregion
               }}
               style={{
@@ -1292,7 +1293,38 @@ export function App() {
         </>
       )}
       {gameState === 'exploration' && selectedPoint && boardLayer && (
-        <>
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            backgroundImage: 'url("/images/ship-4_1.png")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        >
+          {/* 防御设施装饰图标 */}
+          <img 
+            src="/images/pao-1.png" 
+            alt="防御设施"
+            style={{
+              position: 'absolute',
+              left: '872px',
+              top: '485px',
+              zIndex: 10,
+            }}
+          />
+          <img 
+            src="/images/pao-1.png" 
+            alt="防御设施"
+            style={{
+              position: 'absolute',
+              left: '1564px',
+              top: '505px',
+              zIndex: 10,
+            }}
+          />
           {/* 入侵战斗面板 */}
           <InvasionBattlePanel
             invasionState={invasionState}
@@ -1359,7 +1391,7 @@ export function App() {
               />
             );
           })}
-        </>
+        </div>
       )}
       <TeamSelectionPanel
         visible={teamSelectionVisible}
@@ -1482,7 +1514,7 @@ export function App() {
         warehouse={shelterWarehouse}
         onClose={() => {
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/abcc8814-fa11-4364-ab2b-9cb14d54a4af',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:CharacterEquipmentPanel onClose',message:'关闭面板',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7244/ingest/99dbafae-a66d-45a6-82ab-975b44cc18a0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:CharacterEquipmentPanel onClose',message:'关闭面板',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
           // #endregion
           setCharacterEquipmentPanelVisible(false);
         }}

@@ -14,16 +14,16 @@ export interface DefenseFacilityPanelProps {
   onUpgrade: (facilityId: string, updatedFacility: DefenseFacility, updatedWarehouse: ItemStack[]) => void;
 }
 
-// 探索棋盘外围位置（6×4棋盘）
+// 探索棋盘外围位置（4×6棋盘）
 const EDGE_POSITIONS = [
   // 上边缘
-  { x: 0, y: -1 }, { x: 1, y: -1 }, { x: 2, y: -1 }, { x: 3, y: -1 }, { x: 4, y: -1 }, { x: 5, y: -1 },
+  { x: 0, y: -1 }, { x: 1, y: -1 }, { x: 2, y: -1 }, { x: 3, y: -1 },
   // 下边缘
-  { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 }, { x: 5, y: 4 },
+  { x: 0, y: 6 }, { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
   // 左边缘
-  { x: -1, y: 0 }, { x: -1, y: 1 }, { x: -1, y: 2 }, { x: -1, y: 3 },
+  { x: -1, y: 0 }, { x: -1, y: 1 }, { x: -1, y: 2 }, { x: -1, y: 3 }, { x: -1, y: 4 }, { x: -1, y: 5 },
   // 右边缘
-  { x: 6, y: 0 }, { x: 6, y: 1 }, { x: 6, y: 2 }, { x: 6, y: 3 },
+  { x: 4, y: 0 }, { x: 4, y: 1 }, { x: 4, y: 2 }, { x: 4, y: 3 }, { x: 4, y: 4 }, { x: 4, y: 5 },
 ];
 
 export const DefenseFacilityPanel: React.FC<DefenseFacilityPanelProps> = ({
@@ -206,7 +206,7 @@ export const DefenseFacilityPanel: React.FC<DefenseFacilityPanelProps> = ({
         {selectedFacilityConfig && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: '#aaa', marginBottom: 8 }}>选择建造位置:</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, maxWidth: 400 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, maxWidth: 400 }}>
               {EDGE_POSITIONS.map((pos, index) => {
                 const isOccupied = occupiedPositions.has(`${pos.x},${pos.y}`);
                 const isSelected = selectedPosition?.x === pos.x && selectedPosition?.y === pos.y;
