@@ -249,6 +249,47 @@
 - 多个选项可以累积生效，权重会累加，数量上限取最小值
 - 每次进入探索点时，选项列表会重置
 
+### 17. SpecialBoardItemConfig_下层特殊道具配置表.csv - 下层特殊道具配置表
+配置探索棋盘下层多格特殊道具的信息，用于下层多格特殊道具系统。
+
+**字段说明：**
+- `ID`: 道具唯一标识符（如 `ship_weapon_vibration_reducer`）
+- `名称Key`: 文本Key，用于多语言显示道具名称（如 `special_item.vibration_reducer.name`）
+- `描述Key`: 文本Key，用于多语言显示道具描述（可选）
+- `出现概率`: 该道具在每层出现的概率（0-1之间的浮点数，如0.3表示30%）
+- `占用格子形状`: 相对坐标数组（JSON字符串格式），例如：`[[0,0],[1,0],[2,0]]` 表示水平一行三格
+- `效果类型`: 效果类型字符串（如 `ReduceVibrationRate`、`IncreaseShipAttack`、`IncreaseFundsRate`）
+- `效果参数`: 效果参数（JSON字符串格式），例如：`{"amount":1}` 或 `{"multiplier":1.2}`
+- `图标Key`: 图标Key（可选，用于UI显示）
+
+**占用格子形状格式说明：**
+- 使用相对坐标数组表示，例如：
+  - `[[0,0],[1,0],[2,0]]` 表示水平一行三格（从锚点向右延伸）
+  - `[[0,0],[0,1],[0,2]]` 表示垂直一列三格（从锚点向下延伸）
+  - `[[0,0],[1,0],[0,1],[1,1]]` 表示2×2方块
+- 生成时，系统会随机选择一个锚点格子，然后根据相对坐标计算实际占用的格子索引
+- 确保形状不会超出棋盘边界（4×6）
+
+**效果类型说明：**
+- `ReduceVibrationRate`: 降低每回合震动值增加值
+  - 参数：`{"amount": number}` - 减少的数值
+- `IncreaseShipAttack`: 提升勘探船攻击力
+  - 参数：`{"amount": number}` - 增加的数值
+- `IncreaseFundsRate`: 提升资金获取倍率
+  - 参数：`{"multiplier": number}` - 倍率（如1.2表示20%提升）
+
+**配置示例：**
+- 震动值减少器：出现概率0.3，占用形状 `[[0,0],[1,0],[2,0]]`，效果类型 `ReduceVibrationRate`，效果参数 `{"amount":1}`
+- 攻击力提升器：出现概率0.25，占用形状 `[[0,0],[0,1],[0,2]]`，效果类型 `IncreaseShipAttack`，效果参数 `{"amount":5}`
+- 资金倍率提升器：出现概率0.2，占用形状 `[[0,0],[1,0],[0,1],[1,1]]`，效果类型 `IncreaseFundsRate`，效果参数 `{"multiplier":1.2}`
+
+**注意事项：**
+- 出现概率是每层独立计算的，不是全局概率
+- 多个道具不能重叠，系统会自动检查并避免重叠
+- 每层最多生成4个下层道具（可配置）
+- 道具在解锁前只显示轮廓，不显示具体信息
+- 当道具覆盖的所有上层格子都被清空后，立即获得该道具并应用效果
+
 ## 使用方法
 
 ### 方法1：使用Excel编辑（推荐）
@@ -285,6 +326,7 @@ node tools/csv-to-json.js configs/templates configs/json
 ```
 
 转换后的JSON文件将自动生成到 `configs/json/` 目录下：
+- `SpecialBoardItemConfig.json`
 - `ExplorerConfig.json`
 - `TechTreeConfig.json`
 - `MonsterConfig.json`
@@ -323,6 +365,7 @@ node tools/csv-to-json.js configs/templates configs/json
 9. **ExplorerConfig → EquipmentConfig**: 角色可以装备装备，装备槽位数量在角色配置中定义
 10. **DefenseFacilityConfig → ResourceConfig**: 防御设施的建造和升级消耗资源引用资源ID
 11. **OreChoiceConfig → GarbageConfig**: 矿石选择配置的影响矿石ID列表引用垃圾ID
+12. **SpecialBoardItemConfig**: 下层特殊道具配置是独立的，不直接引用其他配置表，但道具效果会影响勘探船属性（震动值、攻击力、资金倍率等）
 
 ## 文件位置
 

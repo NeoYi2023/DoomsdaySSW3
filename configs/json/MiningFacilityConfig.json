@@ -1,0 +1,22 @@
+[
+  {
+    "ID": "mining_drill_basic",
+    "名称Key": "mining.facility.drill.basic.name",
+    "描述Key": "mining.facility.drill.basic.desc",
+    "设施类型": "钻头",
+    "攻击力": 1,
+    "攻击范围": 0,
+    "自动插入规则": "random",
+    "插入优先级": 0
+  },
+  {
+    "ID": "mining_excavator_basic",
+    "名称Key": "mining.facility.excavator.basic.name",
+    "描述Key": "mining.facility.excavator.basic.desc",
+    "设施类型": "挖掘机",
+    "攻击力": 2,
+    "攻击范围": 1,
+    "自动插入规则": "edge",
+    "插入优先级": 1
+  }
+]

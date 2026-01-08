@@ -14,8 +14,14 @@ import { InvasionBattlePanel } from './components/InvasionBattlePanel';
 import { DefenseFacilityPanel } from './components/DefenseFacilityPanel';
 import { OreChoicePanel } from './components/OreChoicePanel';
 import { audioSystem } from './core/AudioSystem';
-import { generateExplorationBoardLayer } from './core/ExplorationSystem';
+import {
+  generateExplorationBoardLayer,
+  checkSpecialItemUnlock,
+  collectSpecialItem,
+} from './core/ExplorationSystem';
+import { applySpecialItemEffect } from './core/SpecialItemSystem';
 import { resolveBattleTurn, processGarbageAfterBattle } from './core/BattleSystem';
+import { resolveGarbageOutput } from './core/EffectSystem';
 import { distributeLootToExplorers, addToExplorerInventory } from './core/InventorySystem';
 import {
   checkInvasionTrigger,
@@ -23,6 +29,19 @@ import {
   processInvasionMonsterMovement,
   calculateVibrationIncrease,
 } from './core/InvasionSystem';
+import {
+  autoInsertMiningFacilities,
+  processMiningFacilityAttack,
+} from './core/MiningFacilitySystem';
+import {
+  convertResources,
+  applyResourceConversion,
+} from './core/ResourceConversionSystem';
+import {
+  checkEnergyThreshold,
+  applyUpgrade,
+  initializeEnergySystem,
+} from './core/EnergySystem';
 import {
   processInvasionBattleTurn,
   createInvasionBattleState,
@@ -58,6 +77,8 @@ import type {
   DefenseFacilityConfigEntry,
   ItemConfigEntry,
   OreChoiceConfigEntry,
+  SpecialBoardItemConfigEntry,
+  MiningFacilityConfigEntry,
 } from './types/configTypes';
 import explorersConfig from '../configs/json/ExplorerConfig.json';
 import monstersConfig from '../configs/json/MonsterConfig.json';
@@ -74,6 +95,8 @@ import shipsConfig from '../configs/json/ShipConfig.json';
 import defenseFacilitiesConfig from '../configs/json/DefenseFacilityConfig.json';
 import itemsConfig from '../configs/json/ItemConfig.json';
 import oreChoicesConfig from '../configs/json/OreChoiceConfig.json';
+import specialBoardItemsConfig from '../configs/json/SpecialBoardItemConfig.json';
+import miningFacilitiesConfig from '../configs/json/MiningFacilityConfig.json';
 
 type GameState = 'map' | 'traveling' | 'exploration';
 
@@ -93,6 +116,8 @@ export function App() {
   const defenseFacilitiesConfigArr = defenseFacilitiesConfig as DefenseFacilityConfigEntry[];
   const itemsConfigArr = itemsConfig as ItemConfigEntry[];
   const oreChoicesConfigArr = oreChoicesConfig as OreChoiceConfigEntry[];
+  const specialBoardItemsConfigArr = specialBoardItemsConfig as SpecialBoardItemConfigEntry[];
+  const miningFacilitiesConfigArr = miningFacilitiesConfig as MiningFacilityConfigEntry[];
 
   const [gameState, setGameState] = useState<GameState>('map');
   const [currentRound, setCurrentRound] = useState(1);
@@ -217,13 +242,21 @@ export function App() {
   useEffect(() => {
     if (prospectingShip === null && shipsConfigArr.length > 0) {
       const defaultShipConfig = shipsConfigArr[0];
-      const ship: ProspectingShip = {
+      const ship: ProspectingShip = initializeEnergySystem({
         shipId: defaultShipConfig.ID,
         config: defaultShipConfig,
         currentHp: defaultShipConfig.初始血量,
         maxHp: defaultShipConfig.最大血量,
         baseVibrationPerRound: defaultShipConfig.每回合震动值增加值,
-      };
+        vibrationReduction: 0,
+        extraAttack: 0,
+        fundsMultiplier: 1.0,
+        currentFunds: 0,
+        currentEnergy: 0,
+        nextEnergyThreshold: 10,
+        upgradeCount: 0,
+        miningFacilities: new Map(),
+      });
       setProspectingShip(ship);
     }
   }, [shipsConfigArr]);
@@ -686,6 +719,7 @@ export function App() {
       monsterConfigs: monstersConfigArr,
       garbageConfigs: garbagesConfigArr,
       layerIndex: 1, // 进入探索点时从第1层开始
+      specialBoardItemConfigs: specialBoardItemsConfigArr,
     });
 
     // 根据棋盘上的怪物创建 Monster 实例
@@ -805,6 +839,7 @@ export function App() {
       explorers: aliveExplorers,
       monsterConfigs: monstersConfigArr,
       garbageConfigs: garbagesConfigArr,
+      specialBoardItemConfigs: specialBoardItemsConfigArr,
       layerIndex: nextLayer,
       oreChoices: oreChoicesConfig.length > 0 ? oreChoicesConfig : undefined,
     });
@@ -894,7 +929,7 @@ export function App() {
 
 
   const handleNextRound = () => {
-    if (!boardLayer || !selectedPoint) return;
+    if (!boardLayer || !selectedPoint || !prospectingShip) return;
     
     // 如果正在进行入侵战斗，不允许推进回合
     if (invasionState?.isActive) {
@@ -914,66 +949,187 @@ export function App() {
     }
     setExplorers(updatedExplorers);
     
-    // 0.2 计算震动值增加（勘探船每回合增加值 + 道具触发增加值）
-    if (prospectingShip && selectedPoint.震动值最大值) {
-      const baseIncrease = prospectingShip.baseVibrationPerRound;
-      // 检查是否有道具触发震动值增加（这里简化处理，后续可以根据实际道具使用情况添加）
+    // ========== 新的10步流程 ==========
+    
+    // 步骤1: 生成探索棋盘中的默认物品（已在进入探索点时完成，这里跳过）
+    let currentBoard = boardLayer;
+    
+    // 步骤2: 勘探船开采设施每一个按照它自己的规则自动插入探索棋盘中
+    const insertResult = autoInsertMiningFacilities(
+      currentBoard,
+      miningFacilitiesConfigArr,
+      prospectingShip.miningFacilities,
+    );
+    currentBoard = insertResult.updatedBoard;
+    const newMiningFacilities = insertResult.newFacilities;
+    
+    // 合并新的开采设施到勘探船
+    const updatedMiningFacilities = new Map(prospectingShip.miningFacilities);
+    for (const [id, facility] of newMiningFacilities.entries()) {
+      updatedMiningFacilities.set(id, facility);
+    }
+    setProspectingShip({
+      ...prospectingShip,
+      miningFacilities: updatedMiningFacilities,
+    });
+    
+    // 步骤3: 这些开采设施对棋盘格子上的物品进行处理
+    const attackResult = processMiningFacilityAttack(
+      currentBoard,
+      updatedMiningFacilities,
+      miningFacilitiesConfigArr,
+      garbagesConfigArr,
+    );
+    currentBoard = attackResult.updatedBoard;
+    const destroyedGarbageIds = attackResult.destroyedGarbageIds;
+    
+    // 步骤4: 根据棋盘格子上的物品当前的处理后，开始计算生成采集到的矿物
+    // 只处理被摧毁的矿物（血量变为0的）
+    const collectedResources: ResourceStack[] = [];
+    for (const destroyedId of destroyedGarbageIds) {
+      const garbageConfig = garbagesConfigArr.find((g) => g.ID === destroyedId);
+      if (!garbageConfig) continue;
+      
+      // 构建上下文用于解析产出
+      const explorersArray = Array.from(updatedExplorers.values());
+      const ctx = {
+        explorers: explorersArray,
+        garbageConfig,
+        board: currentBoard,
+        allGarbageConfigs: garbagesConfigArr,
+        allEquipmentConfigs: equipmentsConfigArr,
+      };
+      
+      // 解析产出（使用现有的resolveGarbageOutput逻辑）
+      const resolved = resolveGarbageOutput(garbageConfig, advancedConditionsArr, ctx);
+      collectedResources.push(...resolved.loot);
+    }
+    
+    // 步骤5: 确认第二层的物品是否满足对应上层的物品都被清除，如果满足则获得该第二层的物品
+    let boardLayerUpdated = false;
+    let updatedBoardForSpecialItems = currentBoard;
+    if (currentBoard.bottomSpecialItems && currentBoard.bottomSpecialItems.length > 0) {
+      updatedBoardForSpecialItems = { ...currentBoard };
+      let shipUpdated = false;
+      let updatedShip = prospectingShip;
+
+      for (const item of updatedBoardForSpecialItems.bottomSpecialItems) {
+        if (item.isCollected) continue;
+
+        // 检查是否满足解锁条件（所有上层格子都被清除）
+        if (checkSpecialItemUnlock(item, updatedBoardForSpecialItems)) {
+          // 收集道具并应用效果
+          const collected = collectSpecialItem(item);
+          updatedShip = applySpecialItemEffect(
+            updatedShip,
+            collected.effectType,
+            collected.effectParams,
+          );
+          shipUpdated = true;
+          boardLayerUpdated = true;
+
+          // 显示获得道具的提示
+          const itemConfig = specialBoardItemsConfigArr.find((c) => c.ID === item.itemConfigId);
+          if (itemConfig) {
+            console.log(`获得特殊道具: ${getText(itemConfig.名称Key)}`);
+          }
+        }
+      }
+
+      // 更新勘探船状态
+      if (shipUpdated && updatedShip) {
+        setProspectingShip(updatedShip);
+      }
+    }
+    currentBoard = boardLayerUpdated ? updatedBoardForSpecialItems : currentBoard;
+    
+    // 获取最新的勘探船状态（可能已被特殊道具更新）
+    const currentShip = prospectingShip;
+    if (!currentShip) return;
+    
+    // 步骤6: 自动将矿物按照转化模式变成对应的资源放入勘探船的仓库。同时在本步骤并行计算震动增加值
+    const conversionResult = convertResources(
+      collectedResources,
+      resourcesConfigArr,
+      currentShip,
+    );
+    const updatedShipAfterConversion = applyResourceConversion(currentShip, conversionResult);
+    
+    // 计算震动值增加（并行进行）
+    let vibrationIncrease = 0;
+    if (selectedPoint.震动值最大值) {
+      const baseIncrease = currentShip.baseVibrationPerRound;
       let itemVibrationIncrease = 0;
       // TODO: 检查道具使用情况，累加震动值增加值
       
-      const vibrationIncrease = calculateVibrationIncrease(baseIncrease, itemVibrationIncrease);
-      const newVibrationValue = Math.min(
-        vibrationValue + vibrationIncrease,
-        selectedPoint.震动值最大值,
+      vibrationIncrease = calculateVibrationIncrease(
+        baseIncrease,
+        itemVibrationIncrease,
+        currentShip.vibrationReduction,
       );
-      setVibrationValue(newVibrationValue);
-      
-      // 检查是否触发怪物入侵
-      if (checkInvasionTrigger(newVibrationValue, selectedPoint.震动值最大值)) {
-        // 触发怪物入侵
-        setProspectingShip((currentShip) => {
-          if (!currentShip) return currentShip;
-          
-          const invasionMonsters = spawnInvasionMonsters(
-            selectedPoint,
-            monstersConfigArr,
-            currentShip.config,
-          );
-          
-          // 处理怪物移动到边缘
-          const movedMonsters = processInvasionMonsterMovement(invasionMonsters);
-          
-          // 创建入侵战斗状态（使用最新的防御设施状态）
-          setDefenseFacilities((currentFacilities) => {
-            const battleState = createInvasionBattleState(
-              currentShip,
-              movedMonsters,
-              currentFacilities,
-            );
-            
-            setInvasionState({
-              isActive: true,
-              invasionMonsters: movedMonsters,
-              facilities: currentFacilities,
-              startTime: Date.now(),
-            });
-            
-            // 启动即时制战斗循环
-            startInvasionBattle(battleState);
-            
-            alert('震动值达到最大值！怪物入侵开始！');
-            return currentFacilities;
-          });
-          
-          return currentShip;
-        });
-        
-        return; // 暂停回合制战斗
-      }
     }
     
-    // 1. 先结算战斗（使用更新后的explorers）
-    const battleResult = resolveBattleTurn(boardLayer, updatedExplorers, monsters);
+    // 更新勘探船状态（资金、能源）
+    setProspectingShip(updatedShipAfterConversion);
+    
+    // 步骤7: 如果震动值达到触发怪物入侵，则触发勘探船的防御战斗。并在战斗结束后更新变化
+    const newVibrationValue = Math.min(
+      vibrationValue + vibrationIncrease,
+      selectedPoint.震动值最大值 ?? Infinity,
+    );
+    setVibrationValue(newVibrationValue);
+    
+    if (checkInvasionTrigger(newVibrationValue, selectedPoint.震动值最大值 ?? 0)) {
+      // 触发怪物入侵
+      const invasionMonsters = spawnInvasionMonsters(
+        selectedPoint,
+        monstersConfigArr,
+        updatedShipAfterConversion.config,
+      );
+      
+      // 处理怪物移动到边缘
+      const movedMonsters = processInvasionMonsterMovement(invasionMonsters);
+      
+      // 创建入侵战斗状态（使用最新的防御设施状态）
+      const battleState = createInvasionBattleState(
+        updatedShipAfterConversion,
+        movedMonsters,
+        defenseFacilities,
+      );
+      
+      setInvasionState({
+        isActive: true,
+        invasionMonsters: movedMonsters,
+        facilities: defenseFacilities,
+        startTime: Date.now(),
+      });
+      
+      // 启动即时制战斗循环
+      startInvasionBattle(battleState);
+      
+      alert('震动值达到最大值！怪物入侵开始！');
+      return; // 暂停回合制战斗
+    }
+    
+    // 步骤8: 统计获得的勘探船新能源数量，确定是否升级（触发三选一）
+    const shouldTriggerUpgrade = checkEnergyThreshold(updatedShipAfterConversion);
+    
+    // 步骤9: 按照勘探船的升级情况触发三选一
+    if (shouldTriggerUpgrade) {
+      // TODO: 显示三选一升级面板
+      // 这里暂时使用alert，后续需要创建专门的升级面板组件
+      alert(`能源达到阈值 ${updatedShipAfterConversion.nextEnergyThreshold}！触发三选一升级！`);
+      // 注意：实际的三选一选择应该在面板中完成，这里只是触发
+      // 步骤10的效果会在下回合应用
+    }
+    
+    // 步骤10: 通过三选一获得的效果存入下回合的计算，本回合不运算
+    // （这一步在玩家选择三选一选项时处理，这里跳过）
+    
+    // ========== 原有的战斗和层完成检查逻辑 ==========
+    
+    // 1. 先结算战斗（使用更新后的explorers和更新后的棋盘）
+    const battleResult = resolveBattleTurn(currentBoard, updatedExplorers, monsters);
     
     
     // 2. 战斗后自动处理垃圾产出
@@ -1007,6 +1163,43 @@ export function App() {
         }
         return Array.from(merged.values());
       });
+    }
+    
+    // 2.2 检查下层特殊道具解锁条件
+    let boardLayerUpdated = false;
+    let updatedBoardForSpecialItems = battleResult.board;
+    if (battleResult.board.bottomSpecialItems && battleResult.board.bottomSpecialItems.length > 0) {
+      updatedBoardForSpecialItems = { ...battleResult.board };
+      let shipUpdated = false;
+      let updatedShip = prospectingShip;
+
+      for (const item of updatedBoardForSpecialItems.bottomSpecialItems) {
+        if (item.isCollected) continue;
+
+        // 检查是否满足解锁条件
+        if (checkSpecialItemUnlock(item, updatedBoardForSpecialItems)) {
+          // 收集道具并应用效果
+          const collected = collectSpecialItem(item);
+          updatedShip = applySpecialItemEffect(
+            updatedShip || prospectingShip!,
+            collected.effectType,
+            collected.effectParams,
+          );
+          shipUpdated = true;
+          boardLayerUpdated = true;
+
+          // 可以在这里显示获得道具的提示
+          const itemConfig = specialBoardItemsConfigArr.find((c) => c.ID === item.itemConfigId);
+          if (itemConfig) {
+            console.log(`获得特殊道具: ${getText(itemConfig.名称Key)}`);
+          }
+        }
+      }
+
+      // 更新勘探船状态
+      if (shipUpdated && updatedShip) {
+        setProspectingShip(updatedShip);
+      }
     }
     
     // 3. 检查是否完成当前层（所有怪物被消灭，且还有至少1个角色存活）
@@ -1097,7 +1290,8 @@ export function App() {
     // 5. 正常更新状态（继续当前层）
     setExplorers(garbageResult.explorers);
     setMonsters(battleResult.monsters);
-    setBoardLayer(battleResult.board);
+    // 更新棋盘状态（如果特殊道具检查中已更新，使用更新后的boardLayer）
+    setBoardLayer(boardLayerUpdated ? updatedBoardForSpecialItems : battleResult.board);
     setCurrentRound((r) => r + 1);
   };
 

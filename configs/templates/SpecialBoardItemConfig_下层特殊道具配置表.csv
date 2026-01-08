@@ -1,0 +1,4 @@
+ID,名称Key,描述Key,出现概率,占用格子形状,效果类型,效果参数,图标Key
+ship_weapon_vibration_reducer,special_item.vibration_reducer.name,special_item.vibration_reducer.desc,0.3,"[[0,0],[1,0],[2,0]]",ReduceVibrationRate,"{""amount"":1}",icon_special_weapon
+ship_weapon_attack_boost,special_item.attack_boost.name,special_item.attack_boost.desc,0.25,"[[0,0],[0,1],[0,2]]",IncreaseShipAttack,"{""amount"":5}",icon_special_weapon
+ship_upgrade_funds_rate,special_item.funds_rate.name,special_item.funds_rate.desc,0.2,"[[0,0],[1,0],[0,1],[1,1]]",IncreaseFundsRate,"{""multiplier"":1.2}",icon_special_upgrade

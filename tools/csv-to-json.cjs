@@ -212,7 +212,8 @@ function main() {
     'LocalizationConfig_多语言配置表.csv': 'LocalizationConfig.json',
     'ShipConfig_勘探船配置表.csv': 'ShipConfig.json',
     'DefenseFacilityConfig_防御设施配置表.csv': 'DefenseFacilityConfig.json',
-    'OreChoiceConfig_矿石选择配置表.csv': 'OreChoiceConfig.json'
+    'OreChoiceConfig_矿石选择配置表.csv': 'OreChoiceConfig.json',
+    'SpecialBoardItemConfig_下层特殊道具配置表.csv': 'SpecialBoardItemConfig.json'
   };
 
   // 特殊处理的配置表（非数组格式）

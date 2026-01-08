@@ -184,8 +184,11 @@ function findNearestEdgePosition(
 export function calculateVibrationIncrease(
   baseVibrationPerRound: number,
   itemVibrationIncrease?: number,
+  vibrationReduction?: number,
 ): number {
-  return baseVibrationPerRound + (itemVibrationIncrease || 0);
+  const base = baseVibrationPerRound + (itemVibrationIncrease || 0);
+  const reduction = vibrationReduction || 0;
+  return Math.max(0, base - reduction);
 }
 
 /**

@@ -50,6 +50,8 @@ export interface ResourceConfigEntry {
   稀有度: string;
   资源类型: string;
   堆叠最大数量: number;
+  资金兑换比?: number; // 1单位资源 = X资金（仅普通资源）
+  能源转换比?: number; // 1单位资源 = X能源（仅能源类资源）
 }
 
 export interface ItemConfigEntry {
@@ -82,6 +84,7 @@ export interface GarbageConfigEntry {
   垃圾类型列表: string; // 类型A|类型B
   进阶产出机制ID列表?: string; // condition ids joined by |
   进阶产出?: string; // 资源ID_数量|资源ID_数量
+  最大血量?: number; // 矿物的最大血量（默认为1，即一击必杀）
 }
 
 export interface AdvancedOutputConditionConfigEntry {
@@ -186,6 +189,29 @@ export interface OreChoiceConfigEntry {
   图标Key?: string; // 图标资源Key（可选）
 }
 
+export interface SpecialBoardItemConfigEntry {
+  ID: string; // 道具ID（唯一标识）
+  名称Key: string; // 道具名称的多语言Key
+  描述Key?: string; // 道具描述的多语言Key
+  出现概率: number; // 该道具在每层出现的概率（0-1）
+  占用格子形状: string | number[][]; // 相对坐标数组（JSON字符串或数组格式），例如：[[0,0],[1,0],[2,0]]
+  效果类型: string; // 效果类型，如 "ReduceVibrationRate", "IncreaseShipAttack"
+  效果参数: string; // 效果参数（JSON字符串），例如：'{"amount":1}'
+  图标Key?: string; // 图标Key（可选，用于UI显示）
+}
+
+export interface MiningFacilityConfigEntry {
+  ID: string; // 开采设施ID
+  名称Key: string;
+  描述Key?: string;
+  设施类型: string; // 如"钻头"、"挖掘机"等
+  攻击力: number; // 对矿物的攻击力（每回合造成的伤害）
+  攻击范围: number; // 攻击范围（格子数，0表示只能攻击所在格子）
+  自动插入规则: string; // 自动插入规则，如"random"、"edge"、"center"等
+  插入优先级?: number; // 插入优先级（数字越小越先插入，默认0）
+  解锁条件?: string; // 解锁条件（可选）
+}
+
 export interface ConfigBundle {
   explorers: ExplorerConfigEntry[];
   monsters: MonsterConfigEntry[];
@@ -204,4 +230,6 @@ export interface ConfigBundle {
   ships: ShipConfigEntry[];
   defenseFacilities: DefenseFacilityConfigEntry[];
   oreChoices: OreChoiceConfigEntry[];
+  specialBoardItems: SpecialBoardItemConfigEntry[];
+  miningFacilities: MiningFacilityConfigEntry[];
 }

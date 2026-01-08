@@ -14,6 +14,7 @@ import type {
   EquipmentConfigEntry,
   ShipConfigEntry,
   DefenseFacilityConfigEntry,
+  MiningFacilityConfigEntry,
 } from './configTypes';
 
 export interface ItemStack {
@@ -81,11 +82,25 @@ export interface ExplorationBoardCell {
   explorerId?: string;
   monsterId?: string;
   garbageId?: string;
+  miningFacilityId?: string; // 开采设施ID
+  garbageCurrentHp?: number; // 矿物的当前血量（如果存在）
+  garbageMaxHp?: number; // 矿物的最大血量（如果存在）
+}
+
+export interface MultiCellSpecialItem {
+  id: string; // 实例唯一ID
+  itemConfigId: string; // 配置表中的道具ID
+  coveredCellIndices: number[]; // 占用的格子索引数组（0-23）
+  isDiscovered: boolean; // 是否已揭示（当前版本始终false直到解锁）
+  isCollected: boolean; // 是否已被收集
+  effectType: string; // 效果类型
+  effectParams: Record<string, number>; // 效果参数
 }
 
 export interface ExplorationBoardLayer {
   layerIndex: number; // 1-based
   cells: ExplorationBoardCell[];
+  bottomSpecialItems?: MultiCellSpecialItem[]; // 下层特殊道具列表
 }
 
 export interface ExplorationSession {
@@ -181,12 +196,31 @@ export interface Equipment {
   matchedGarbageTypes: string[]; // 匹配的垃圾类型列表
 }
 
+export interface MiningFacility {
+  id: string; // 设施实例ID
+  configId: string; // 配置表中的设施ID
+  cellIndex: number; // 所在的格子索引
+  lastProcessTime: number; // 上次处理时间（用于攻击速度控制）
+}
+
 export interface ProspectingShip {
   shipId: string;
   config: ShipConfigEntry;
   currentHp: number; // 船体当前血量
   maxHp: number; // 船体最大血量
   baseVibrationPerRound: number; // 每回合默认增加的震动值（可通过升级降低）
+  // 下层特殊道具提供的Buff效果
+  vibrationReduction: number; // 震动值减少量（累加）
+  extraAttack: number; // 额外攻击力（累加）
+  fundsMultiplier: number; // 资金倍率（累乘，初始为1.0）
+  // 资源系统
+  currentFunds: number; // 当前资金
+  // 能源系统
+  currentEnergy: number; // 当前能源值
+  nextEnergyThreshold: number; // 下次触发三选一的能源阈值
+  upgradeCount: number; // 已完成的升级次数
+  // 开采设施
+  miningFacilities: Map<string, MiningFacility>; // 开采设施列表
 }
 
 export interface DefenseFacility {
@@ -221,4 +255,5 @@ export type {
   EquipmentConfigEntry,
   ShipConfigEntry,
   DefenseFacilityConfigEntry,
+  MiningFacilityConfigEntry,
 };

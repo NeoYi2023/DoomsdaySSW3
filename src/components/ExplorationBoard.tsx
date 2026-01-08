@@ -214,6 +214,66 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
     const totalWidth = boardWidth + padding * 2;
     const totalHeight = boardHeight + padding * 2;
 
+    // 渲染下层特殊道具
+    const renderBottomSpecialItems = () => {
+      if (!layer.bottomSpecialItems || layer.bottomSpecialItems.length === 0) return null;
+
+      const itemElements: JSX.Element[] = [];
+      const boardWidthCells = 4; // 棋盘宽度（格子数）
+
+      for (const item of layer.bottomSpecialItems) {
+        if (item.isCollected) continue; // 已收集的道具不显示
+
+        // 计算覆盖区域的边界
+        const indices = item.coveredCellIndices;
+        if (indices.length === 0) continue;
+
+        const minX = Math.min(...indices.map((idx) => idx % boardWidthCells));
+        const maxX = Math.max(...indices.map((idx) => idx % boardWidthCells));
+        const minY = Math.min(...indices.map((idx) => Math.floor(idx / boardWidthCells)));
+        const maxY = Math.max(...indices.map((idx) => Math.floor(idx / boardWidthCells)));
+
+        const left = minX * cellSize + padding;
+        const top = minY * cellSize + padding;
+        const width = (maxX - minX + 1) * cellSize - padding * 2;
+        const height = (maxY - minY + 1) * cellSize - padding * 2;
+
+        itemElements.push(
+          <div
+            key={item.id}
+            style={{
+              position: 'absolute',
+              left: `${left}px`,
+              top: `${top}px`,
+              width: `${width}px`,
+              height: `${height}px`,
+              border: '2px dashed rgba(100, 200, 255, 0.6)',
+              background: 'rgba(100, 200, 255, 0.1)',
+              borderRadius: 4,
+              zIndex: 0.5,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="未知特殊装置"
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: 'rgba(100, 200, 255, 0.8)',
+                textAlign: 'center',
+              }}
+            >
+              ?
+            </div>
+          </div>,
+        );
+      }
+
+      return itemElements;
+    };
+
     return (
       <div style={{ position: 'relative' }}>
         <h2>探索棋盘 - 第 {layer.layerIndex} 层</h2>
@@ -235,6 +295,8 @@ export const ExplorationBoard = forwardRef<ExplorationBoardRef, ExplorationBoard
             zIndex: 1,
           }}
         >
+          {/* 渲染下层特殊道具（在背景和上层格子之间） */}
+          {renderBottomSpecialItems()}
           {rows}
           {/* 渲染入侵怪物 */}
           {renderInvasionMonsters()}

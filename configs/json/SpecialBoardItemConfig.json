@@ -1,0 +1,32 @@
+[
+  {
+    "ID": "ship_weapon_vibration_reducer",
+    "名称Key": "special_item.vibration_reducer.name",
+    "描述Key": "special_item.vibration_reducer.desc",
+    "出现概率": 0.3,
+    "占用格子形状": "[[0,0],[1,0],[2,0]]",
+    "效果类型": "ReduceVibrationRate",
+    "效果参数": "{\"amount\":1}",
+    "图标Key": "icon_special_weapon"
+  },
+  {
+    "ID": "ship_weapon_attack_boost",
+    "名称Key": "special_item.attack_boost.name",
+    "描述Key": "special_item.attack_boost.desc",
+    "出现概率": 0.25,
+    "占用格子形状": "[[0,0],[0,1],[0,2]]",
+    "效果类型": "IncreaseShipAttack",
+    "效果参数": "{\"amount\":5}",
+    "图标Key": "icon_special_weapon"
+  },
+  {
+    "ID": "ship_upgrade_funds_rate",
+    "名称Key": "special_item.funds_rate.name",
+    "描述Key": "special_item.funds_rate.desc",
+    "出现概率": 0.2,
+    "占用格子形状": "[[0,0],[1,0],[0,1],[1,1]]",
+    "效果类型": "IncreaseFundsRate",
+    "效果参数": "{\"multiplier\":1.2}",
+    "图标Key": "icon_special_upgrade"
+  }
+]

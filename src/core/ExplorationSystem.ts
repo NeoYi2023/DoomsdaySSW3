@@ -7,7 +7,9 @@ import type {
   GarbageUnitRuntime,
   MonsterConfigEntry,
   GarbageConfigEntry,
+  MultiCellSpecialItem,
 } from '../types/gameTypes';
+import type { SpecialBoardItemConfigEntry } from '../types/configTypes';
 
 export interface SpawnEntry {
   kind: 'Monster' | 'Garbage' | string;
@@ -26,6 +28,7 @@ export interface ExplorationBoardGenerationInput {
     weightMultiplier?: number; // 权重倍数（默认1.0）
     maxCount?: number; // 数量上限（默认无限制）
   }>; // 矿石选择影响列表（可选，累积生效）
+  specialBoardItemConfigs?: SpecialBoardItemConfigEntry[]; // 下层特殊道具配置列表（可选）
 }
 
 export interface ExplorationBoardGenerationResult {
@@ -234,10 +237,214 @@ export function generateExplorationBoardLayer(
   }
   
 
+  // 3. 生成下层特殊道具
+  const bottomSpecialItems = input.specialBoardItemConfigs
+    ? generateBottomSpecialItems(input.specialBoardItemConfigs, totalCells)
+    : [];
+
   const layer: ExplorationBoardLayer = {
     layerIndex: input.layerIndex,
     cells,
+    bottomSpecialItems,
   };
 
   return { layer };
+}
+
+/**
+ * 检查格子索引是否有效（在0-23范围内）
+ */
+function checkCellIndicesValid(indices: number[], totalCells: number): boolean {
+  return indices.every((idx) => idx >= 0 && idx < totalCells);
+}
+
+/**
+ * 检查两个道具是否重叠
+ */
+function checkItemsOverlap(
+  item1: MultiCellSpecialItem,
+  item2: MultiCellSpecialItem,
+): boolean {
+  const set1 = new Set(item1.coveredCellIndices);
+  return item2.coveredCellIndices.some((idx) => set1.has(idx));
+}
+
+/**
+ * 根据相对坐标形状和锚点计算实际格子索引
+ */
+function calculateCellIndicesFromShape(
+  shape: number[][],
+  anchorIndex: number,
+  boardWidth: number,
+  boardHeight: number,
+): number[] {
+  const anchorX = anchorIndex % boardWidth;
+  const anchorY = Math.floor(anchorIndex / boardWidth);
+  
+  const indices: number[] = [];
+  for (const [dx, dy] of shape) {
+    const newX = anchorX + dx;
+    const newY = anchorY + dy;
+    
+    // 检查边界
+    if (newX >= 0 && newX < boardWidth && newY >= 0 && newY < boardHeight) {
+      const index = newY * boardWidth + newX;
+      indices.push(index);
+    }
+  }
+  
+  return indices;
+}
+
+/**
+ * 解析占用格子形状（支持JSON字符串或数组格式）
+ */
+function parseShape(shape: string | number[][]): number[][] {
+  if (Array.isArray(shape)) {
+    return shape;
+  }
+  try {
+    return JSON.parse(shape);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 解析效果参数（JSON字符串）
+ */
+function parseEffectParams(params: string): Record<string, number> {
+  try {
+    return JSON.parse(params);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 生成下层特殊道具
+ */
+function generateBottomSpecialItems(
+  itemConfigs: SpecialBoardItemConfigEntry[],
+  totalCells: number,
+): MultiCellSpecialItem[] {
+  const boardWidth = 4;
+  const boardHeight = 6;
+  const items: MultiCellSpecialItem[] = [];
+  const usedIndices = new Set<number>();
+  const maxAttempts = 50; // 每个道具最多尝试50次放置
+  const maxItemsPerLayer = 4; // 每层最多生成4个道具
+
+  for (const config of itemConfigs) {
+    if (items.length >= maxItemsPerLayer) break;
+
+    // 根据出现概率决定是否生成
+    if (Math.random() > config.出现概率) continue;
+
+    // 解析形状
+    const shape = parseShape(config.占用格子形状);
+    if (shape.length === 0) continue;
+
+    // 尝试放置道具
+    let placed = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // 随机选择锚点
+      const anchorIndex = Math.floor(Math.random() * totalCells);
+      
+      // 计算实际占用的格子索引
+      const coveredIndices = calculateCellIndicesFromShape(
+        shape,
+        anchorIndex,
+        boardWidth,
+        boardHeight,
+      );
+
+      // 检查是否有效
+      if (!checkCellIndicesValid(coveredIndices, totalCells)) continue;
+      if (coveredIndices.length !== shape.length) continue; // 形状超出边界
+
+      // 检查是否与已放置的道具重叠
+      const overlaps = items.some((item) => {
+        const set1 = new Set(item.coveredCellIndices);
+        return coveredIndices.some((idx) => set1.has(idx));
+      });
+
+      if (overlaps) continue;
+
+      // 检查是否与已使用的索引重叠（可选，用于更严格的检查）
+      const hasUsedIndex = coveredIndices.some((idx) => usedIndices.has(idx));
+      if (hasUsedIndex) continue;
+
+      // 创建道具实例
+      const item: MultiCellSpecialItem = {
+        id: `${config.ID}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        itemConfigId: config.ID,
+        coveredCellIndices: coveredIndices,
+        isDiscovered: false,
+        isCollected: false,
+        effectType: config.效果类型,
+        effectParams: parseEffectParams(config.效果参数),
+      };
+
+      items.push(item);
+      coveredIndices.forEach((idx) => usedIndices.add(idx));
+      placed = true;
+      break;
+    }
+
+    // 如果尝试多次仍未放置成功，跳过该道具
+    if (!placed) {
+      // 可以在这里记录日志，但为了不影响性能，暂时不记录
+    }
+  }
+
+  return items;
+}
+
+/**
+ * 检查特殊道具是否满足解锁条件
+ * 解锁条件：道具覆盖的所有上层格子都已清空（无怪物、无垃圾）
+ */
+export function checkSpecialItemUnlock(
+  item: MultiCellSpecialItem,
+  boardLayer: ExplorationBoardLayer,
+): boolean {
+  // 如果已经收集，直接返回false
+  if (item.isCollected) return false;
+
+  // 检查所有覆盖的格子是否都已清空
+  for (const cellIndex of item.coveredCellIndices) {
+    const cell = boardLayer.cells.find((c) => c.index === cellIndex);
+    if (!cell) return false; // 格子不存在
+
+    // 检查是否有怪物
+    if (cell.monsterId) return false;
+
+    // 检查是否有垃圾/矿物
+    if (cell.garbageId) return false;
+
+    // 可以添加其他阻挡元素的检查
+  }
+
+  return true;
+}
+
+/**
+ * 收集特殊道具并返回效果信息
+ * 注意：此函数只标记为已收集，不直接应用效果
+ */
+export function collectSpecialItem(item: MultiCellSpecialItem): {
+  item: MultiCellSpecialItem;
+  effectType: string;
+  effectParams: Record<string, number>;
+} {
+  // 标记为已收集
+  item.isCollected = true;
+  item.isDiscovered = true; // 解锁时揭示
+
+  return {
+    item,
+    effectType: item.effectType,
+    effectParams: item.effectParams,
+  };
 }
